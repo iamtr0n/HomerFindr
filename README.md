@@ -1,0 +1,2 @@
+# Boothlytics
+Photobooth Analytics Software

@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [ ] **Phase 1: Interactive CLI Core** - Arrow-key navigation, ASCII art splash, search wizard, and Rich results — the zero-typing CLI experience
 - [ ] **Phase 2: CLI Settings and Configuration** - Settings page, SMTP wizard, saved searches browser, first-run setup, and persistent config
-- [ ] **Phase 3: Web UI Redesign** - Professional Zillow/Redfin-inspired dashboard with property cards, sortable results, and cross-cutting data quality fixes
+- [x] **Phase 3: Web UI Redesign** - Professional Zillow/Redfin-inspired dashboard with property cards, sortable results, and cross-cutting data quality fixes (completed 2026-03-25)
 - [ ] **Phase 4: Bridge and Desktop Packaging** - Launch Web UI from CLI, global homerfindr command, and macOS .app shortcut
 
 ## Phase Details
@@ -63,12 +63,12 @@ Plans:
   3. Results can be sorted (price, sqft, beds) and filtered (price range, min beds, min baths) from the dashboard
   4. The dashboard home page shows saved searches and recent results; the design uses a clean real estate color scheme with professional typography
   5. When a provider returns an error or 403, a visible error message tells the user which provider failed rather than silently returning empty results
-**Plans:** 3/4 plans executed
+**Plans:** 4/4 plans complete
 
 Plans:
 - [x] 03-01-PLAN.md — Fix bugs (FIX-01, FIX-03, FIX-04), provider error collection (XC-02 backend), enhanced dedup (XC-01)
 - [x] 03-02-PLAN.md — Design system foundation: Tailwind brand palette, shadcn/ui primitives (Card/Badge/Button), HomerFindr branding (XC-03)
-- [ ] 03-03-PLAN.md — Redesign PropertyCard and Dashboard with shadcn/ui, stat header, recent activity section (WEB-01, WEB-02, WEB-03, WEB-05)
+- [x] 03-03-PLAN.md — Redesign PropertyCard and Dashboard with shadcn/ui, stat header, recent activity section (WEB-01, WEB-02, WEB-03, WEB-05)
 - [x] 03-04-PLAN.md — Client-side filter controls for SearchResults (WEB-04), provider error banners on both search pages (XC-02 frontend, WEB-05)
 
 ### Phase 4: Bridge and Desktop Packaging
@@ -93,5 +93,5 @@ Note: Phase 3 is independent of Phase 2 and can be worked in parallel with Phase
 |-------|----------------|--------|-----------|
 | 1. Interactive CLI Core | 4/4 | Complete |  |
 | 2. CLI Settings and Configuration | 1/3 | In Progress|  |
-| 3. Web UI Redesign | 3/4 | In Progress|  |
+| 3. Web UI Redesign | 4/4 | Complete   | 2026-03-25 |
 | 4. Bridge and Desktop Packaging | 0/TBD | Not started | - |

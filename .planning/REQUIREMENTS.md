@@ -36,9 +36,9 @@
 
 ### Web UI
 
-- [ ] **WEB-01**: Clean, minimal Zillow/Redfin-inspired dashboard layout
-- [ ] **WEB-02**: Property cards with thumbnail photos, price, beds/baths/sqft, and click-through to original listing
-- [ ] **WEB-03**: Dashboard home page showing saved searches overview and recent results
+- [x] **WEB-01**: Clean, minimal Zillow/Redfin-inspired dashboard layout
+- [x] **WEB-02**: Property cards with thumbnail photos, price, beds/baths/sqft, and click-through to original listing
+- [x] **WEB-03**: Dashboard home page showing saved searches overview and recent results
 - [x] **WEB-04**: Sortable/filterable search results grid
 - [x] **WEB-05**: Responsive design that works on mobile browsers (for sharing with friends/family)
 - [x] **WEB-06**: Professional color scheme and typography (clean real estate aesthetic)
@@ -106,9 +106,9 @@
 | CFG-05 | Phase 2 | Complete |
 | CFG-06 | Phase 2 | Complete |
 | CFG-07 | Phase 2 | Complete |
-| WEB-01 | Phase 3 | Pending |
-| WEB-02 | Phase 3 | Pending |
-| WEB-03 | Phase 3 | Pending |
+| WEB-01 | Phase 3 | Complete |
+| WEB-02 | Phase 3 | Complete |
+| WEB-03 | Phase 3 | Complete |
 | WEB-04 | Phase 3 | Complete |
 | WEB-05 | Phase 3 | Complete |
 | WEB-06 | Phase 3 | Complete |

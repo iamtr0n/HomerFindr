@@ -20,6 +20,9 @@ export const api = {
   runSearch: (id) => request(`/searches/${id}/run`, { method: 'POST' }),
   deleteSearch: (id) => request(`/searches/${id}`, { method: 'DELETE' }),
   getResults: (id, newOnly = false) => request(`/searches/${id}/results?new_only=${newOnly}`),
+  // FIX-01: verified — paths match, no double /api prefix
+  // BASE='/api' + '/search/preview' → fetch('/api/search/preview')
+  // Vite proxy: /api/* → http://127.0.0.1:8000/api/* → backend @app.post("/api/search/preview")
   previewSearch: (criteria) => request('/search/preview', {
     method: 'POST',
     body: JSON.stringify({ criteria }),

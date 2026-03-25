@@ -103,10 +103,18 @@ def save_search(search: SavedSearch) -> int:
 def get_saved_searches(active_only: bool = False) -> list[SavedSearch]:
     conn = get_connection()
     try:
-        query = "SELECT * FROM saved_searches"
+        query = """
+            SELECT ss.*,
+                   COALESCE((
+                       SELECT COUNT(*)
+                       FROM search_results sr
+                       WHERE sr.search_id = ss.id
+                   ), 0) AS result_count
+            FROM saved_searches ss
+        """
         if active_only:
-            query += " WHERE is_active = 1"
-        query += " ORDER BY created_at DESC"
+            query += " WHERE ss.is_active = 1"
+        query += " ORDER BY ss.created_at DESC"
         rows = conn.execute(query).fetchall()
         results = []
         for row in rows:
@@ -117,6 +125,7 @@ def get_saved_searches(active_only: bool = False) -> list[SavedSearch]:
                 created_at=datetime.fromisoformat(row["created_at"]) if row["created_at"] else None,
                 last_run_at=datetime.fromisoformat(row["last_run_at"]) if row["last_run_at"] else None,
                 is_active=bool(row["is_active"]),
+                result_count=row["result_count"],
             ))
         return results
     finally:
@@ -126,7 +135,19 @@ def get_saved_searches(active_only: bool = False) -> list[SavedSearch]:
 def get_saved_search(search_id: int) -> Optional[SavedSearch]:
     conn = get_connection()
     try:
-        row = conn.execute("SELECT * FROM saved_searches WHERE id = ?", (search_id,)).fetchone()
+        row = conn.execute(
+            """
+            SELECT ss.*,
+                   COALESCE((
+                       SELECT COUNT(*)
+                       FROM search_results sr
+                       WHERE sr.search_id = ss.id
+                   ), 0) AS result_count
+            FROM saved_searches ss
+            WHERE ss.id = ?
+            """,
+            (search_id,),
+        ).fetchone()
         if not row:
             return None
         return SavedSearch(
@@ -136,6 +157,7 @@ def get_saved_search(search_id: int) -> Optional[SavedSearch]:
             created_at=datetime.fromisoformat(row["created_at"]) if row["created_at"] else None,
             last_run_at=datetime.fromisoformat(row["last_run_at"]) if row["last_run_at"] else None,
             is_active=bool(row["is_active"]),
+            result_count=row["result_count"],
         )
     finally:
         conn.close()
@@ -144,7 +166,19 @@ def get_saved_search(search_id: int) -> Optional[SavedSearch]:
 def get_saved_search_by_name(name: str) -> Optional[SavedSearch]:
     conn = get_connection()
     try:
-        row = conn.execute("SELECT * FROM saved_searches WHERE name = ?", (name,)).fetchone()
+        row = conn.execute(
+            """
+            SELECT ss.*,
+                   COALESCE((
+                       SELECT COUNT(*)
+                       FROM search_results sr
+                       WHERE sr.search_id = ss.id
+                   ), 0) AS result_count
+            FROM saved_searches ss
+            WHERE ss.name = ?
+            """,
+            (name,),
+        ).fetchone()
         if not row:
             return None
         return SavedSearch(
@@ -154,6 +188,7 @@ def get_saved_search_by_name(name: str) -> Optional[SavedSearch]:
             created_at=datetime.fromisoformat(row["created_at"]) if row["created_at"] else None,
             last_run_at=datetime.fromisoformat(row["last_run_at"]) if row["last_run_at"] else None,
             is_active=bool(row["is_active"]),
+            result_count=row["result_count"],
         )
     finally:
         conn.close()

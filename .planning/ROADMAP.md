@@ -50,7 +50,7 @@ Plans:
 
 Plans:
 - [x] 02-01-PLAN.md — Config module (load/save JSON), SMTP wizard with provider presets and test-send, first-run setup wizard
-- [ ] 02-02-PLAN.md — Settings page (Email/Defaults/About sub-pages), saved searches browser (table + Run Now/Toggle/Rename/Delete)
+- [x] 02-02-PLAN.md — Settings page (Email/Defaults/About sub-pages), saved searches browser (table + Run Now/Toggle/Rename/Delete)
 - [ ] 02-03-PLAN.md — Wire all Phase 2 modules into menu.py, end-to-end verification checkpoint
 
 ### Phase 3: Web UI Redesign

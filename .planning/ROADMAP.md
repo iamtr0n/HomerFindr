@@ -29,7 +29,13 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. A complete home search (all 15 fields) can be configured and submitted using only arrow keys and Enter
   4. A Rich progress spinner is visible during the search scrape and the CLI stays interactive (does not freeze)
   5. Search results appear in a colorful Rich table with price, beds, baths, sqft, and address; pressing Enter or a key returns to main menu
-**Plans**: TBD
+**Plans:** 4 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Fix FastAPI deprecation (FIX-02), add questionary/art deps, create TUI package with shared styles
+- [ ] 01-02-PLAN.md — ASCII art splash screen with typewriter animation, main menu loop, entry point rewiring
+- [ ] 01-03-PLAN.md — 15-field search wizard with arrow-key navigation and pre-built option lists
+- [ ] 01-04-PLAN.md — Non-blocking search with spinner, colorful results table, URL opening, save flow
 
 ### Phase 2: CLI Settings and Configuration
 **Goal**: Users can configure email reports, set search defaults, and manage saved searches without leaving the CLI
@@ -74,7 +80,7 @@ Note: Phase 3 is independent of Phase 2 and can be worked in parallel with Phase
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Interactive CLI Core | 0/TBD | Not started | - |
+| 1. Interactive CLI Core | 0/4 | Planning complete | - |
 | 2. CLI Settings and Configuration | 0/TBD | Not started | - |
 | 3. Web UI Redesign | 0/TBD | Not started | - |
 | 4. Bridge and Desktop Packaging | 0/TBD | Not started | - |

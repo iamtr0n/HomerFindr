@@ -10,6 +10,7 @@ from typing import Optional
 
 from homesearch import database as db
 from homesearch.models import SearchCriteria, ListingType, PropertyType, SavedSearch, Listing
+from homesearch.tui.menu import tui_main
 
 app = typer.Typer(
     name="homesearch",
@@ -24,26 +25,9 @@ console = Console()
 
 @app.callback(invoke_without_command=True)
 def main(ctx: typer.Context):
-    """HomeSearch Aggregator - search all real estate platforms at once."""
+    """HomerFindr - search all real estate platforms at once."""
     if ctx.invoked_subcommand is None:
-        console.print(Panel.fit(
-            "[bold blue]HomeSearch Aggregator[/bold blue]\n"
-            "Find your perfect home across all platforms.",
-            border_style="blue",
-        ))
-        choice = Prompt.ask(
-            "What would you like to do?",
-            choices=["search", "web", "saved", "report"],
-            default="search",
-        )
-        if choice == "search":
-            search_interactive()
-        elif choice == "web":
-            serve()
-        elif choice == "saved":
-            saved_list()
-        elif choice == "report":
-            report()
+        tui_main()
 
 
 @app.command()

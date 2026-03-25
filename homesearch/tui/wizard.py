@@ -1,0 +1,482 @@
+"""15-field search wizard with arrow-key navigation for HomerFindr TUI."""
+
+from typing import Optional
+
+import questionary
+from rich.panel import Panel
+from rich.table import Table
+
+from homesearch.models import ListingType, PropertyType, SearchCriteria
+from homesearch.tui.styles import HOUSE_STYLE, console
+
+
+# ---------------------------------------------------------------------------
+# Parser helpers
+# ---------------------------------------------------------------------------
+
+def _parse_price_range(choice: str) -> tuple[Optional[int], Optional[int]]:
+    """Map price range label to (price_min, price_max)."""
+    if choice == "Any":
+        return (None, None)
+    mapping = {
+        "Under $100k":     (None, 100_000),
+        "$100k - $200k":   (100_000, 200_000),
+        "$200k - $300k":   (200_000, 300_000),
+        "$300k - $400k":   (300_000, 400_000),
+        "$400k - $500k":   (400_000, 500_000),
+        "$500k - $750k":   (500_000, 750_000),
+        "$750k - $1M":     (750_000, 1_000_000),
+        "$1M - $1.5M":     (1_000_000, 1_500_000),
+        "Over $1.5M":      (1_500_000, None),
+    }
+    return mapping.get(choice, (None, None))
+
+
+def _parse_sqft_range(choice: str) -> tuple[Optional[int], Optional[int]]:
+    """Map square footage label to (sqft_min, sqft_max)."""
+    if choice == "Any":
+        return (None, None)
+    mapping = {
+        "Under 1,000":     (None, 1_000),
+        "1,000 - 1,500":   (1_000, 1_500),
+        "1,500 - 2,000":   (1_500, 2_000),
+        "2,000 - 3,000":   (2_000, 3_000),
+        "3,000 - 4,000":   (3_000, 4_000),
+        "Over 4,000":      (4_000, None),
+    }
+    return mapping.get(choice, (None, None))
+
+
+def _parse_lot_range(choice: str) -> tuple[Optional[int], Optional[int]]:
+    """Map lot size label to (lot_sqft_min, lot_sqft_max)."""
+    if choice == "Any":
+        return (None, None)
+    mapping = {
+        "Under 5,000 sqft":       (None, 5_000),
+        "5,000 - 10,000 sqft":    (5_000, 10_000),
+        "10,000 - 20,000 sqft":   (10_000, 20_000),
+        "Over 20,000 sqft":       (20_000, None),
+        "Over 1 acre":            (43_560, None),
+    }
+    return mapping.get(choice, (None, None))
+
+
+def _parse_year(choice: str) -> Optional[int]:
+    """Map year built label to year_built_min (None for Any)."""
+    if choice == "Any":
+        return None
+    mapping = {
+        "2020+":        2020,
+        "2010+":        2010,
+        "2000+":        2000,
+        "1990+":        1990,
+        "1980+":        1980,
+        "1970 or older": None,
+    }
+    return mapping.get(choice, None)
+
+
+def _parse_hoa(choice: str) -> Optional[float]:
+    """Map HOA label to hoa_max (None for Any/No limit)."""
+    if choice in ("Any / No limit",):
+        return None
+    mapping = {
+        "No HOA ($0)":    0.0,
+        "Up to $100/mo":  100.0,
+        "Up to $200/mo":  200.0,
+        "Up to $300/mo":  300.0,
+        "Up to $500/mo":  500.0,
+    }
+    return mapping.get(choice, None)
+
+
+# ---------------------------------------------------------------------------
+# Summary panel
+# ---------------------------------------------------------------------------
+
+def _display_summary(criteria: SearchCriteria) -> None:
+    """Render a Rich table panel showing all non-default criteria."""
+    table = Table(show_header=True, header_style="bold cyan", show_lines=False)
+    table.add_column("Field", style="dim", min_width=18)
+    table.add_column("Value", style="white")
+
+    def add(field: str, value) -> None:
+        if value is not None and value != "" and value != [] and value != 0.0:
+            table.add_row(field, str(value))
+
+    # Listing type is always set
+    table.add_row("Listing type", criteria.listing_type.value)
+
+    if criteria.property_types:
+        table.add_row("Property type", ", ".join(pt.value for pt in criteria.property_types))
+
+    add("Location", criteria.location)
+    add("Radius", f"{criteria.radius_miles} miles")
+
+    if criteria.zip_codes:
+        table.add_row("ZIP codes", f"{len(criteria.zip_codes)} selected")
+    if criteria.excluded_zips:
+        table.add_row("Excluded ZIPs", ", ".join(criteria.excluded_zips))
+
+    if criteria.price_min is not None or criteria.price_max is not None:
+        lo = f"${criteria.price_min:,}" if criteria.price_min is not None else "Any"
+        hi = f"${criteria.price_max:,}" if criteria.price_max is not None else "Any"
+        table.add_row("Price range", f"{lo} - {hi}")
+
+    add("Min bedrooms", criteria.bedrooms_min)
+    add("Min bathrooms", criteria.bathrooms_min)
+
+    if criteria.sqft_min is not None or criteria.sqft_max is not None:
+        lo = f"{criteria.sqft_min:,}" if criteria.sqft_min is not None else "Any"
+        hi = f"{criteria.sqft_max:,}" if criteria.sqft_max is not None else "Any"
+        table.add_row("Square footage", f"{lo} - {hi}")
+
+    if criteria.lot_sqft_min is not None or criteria.lot_sqft_max is not None:
+        lo = f"{criteria.lot_sqft_min:,}" if criteria.lot_sqft_min is not None else "Any"
+        hi = f"{criteria.lot_sqft_max:,}" if criteria.lot_sqft_max is not None else "Any"
+        table.add_row("Lot size", f"{lo} - {hi}")
+
+    add("Year built min", criteria.year_built_min)
+    add("Min stories", criteria.stories_min)
+
+    if criteria.has_basement is not None:
+        table.add_row("Basement", "Required" if criteria.has_basement else "No basement")
+    if criteria.has_garage is not None:
+        table.add_row("Garage", "Required" if criteria.has_garage else "No garage")
+    add("Min garage spaces", criteria.garage_spaces_min)
+
+    if criteria.hoa_max is not None:
+        label = "$0 (No HOA)" if criteria.hoa_max == 0.0 else f"Up to ${criteria.hoa_max:.0f}/mo"
+        table.add_row("HOA max", label)
+
+    console.print(Panel(table, title="[bold cyan]Search Summary[/bold cyan]", border_style="cyan"))
+
+
+# ---------------------------------------------------------------------------
+# Main wizard
+# ---------------------------------------------------------------------------
+
+def run_search_wizard() -> SearchCriteria | None:
+    """Run the 15-field interactive search wizard.
+
+    Navigable entirely with arrow keys and Enter except for the location field
+    (city/ZIP typing). Returns a SearchCriteria on success, None if cancelled.
+    """
+    while True:
+        result = _run_wizard_once()
+        if result is None:
+            # User cancelled mid-wizard
+            return None
+        criteria, action = result
+        if action == "yes":
+            return criteria
+        if action == "cancel":
+            return None
+        # action == "edit" — loop back to start
+
+
+def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
+    """Execute the wizard fields once. Returns (criteria, action) or None on cancel."""
+    from homesearch.services.zip_service import discover_zip_codes
+
+    # ------------------------------------------------------------------
+    # 1. Listing Type (required — no instruction hint)
+    # ------------------------------------------------------------------
+    listing_answer = questionary.select(
+        "Listing type:",
+        choices=["For Sale", "For Rent", "Recently Sold"],
+        style=HOUSE_STYLE,
+    ).ask()
+    if listing_answer is None:
+        return None
+    listing_type_map = {
+        "For Sale": ListingType.SALE,
+        "For Rent": ListingType.RENT,
+        "Recently Sold": ListingType.SOLD,
+    }
+    listing_type = listing_type_map[listing_answer]
+
+    # ------------------------------------------------------------------
+    # 2. Property Type
+    # ------------------------------------------------------------------
+    prop_answer = questionary.select(
+        "Property type:",
+        choices=["Any", "Single Family", "Condo", "Townhouse", "Multi-Family", "Commercial", "Land"],
+        style=HOUSE_STYLE,
+        instruction="(Enter to skip)",
+    ).ask()
+    if prop_answer is None:
+        return None
+    prop_map = {
+        "Single Family": PropertyType.SINGLE_FAMILY,
+        "Condo": PropertyType.CONDO,
+        "Townhouse": PropertyType.TOWNHOUSE,
+        "Multi-Family": PropertyType.MULTI_FAMILY,
+        "Commercial": PropertyType.COMMERCIAL,
+        "Land": PropertyType.LAND,
+    }
+    property_types = [] if prop_answer == "Any" else [prop_map[prop_answer]]
+
+    # ------------------------------------------------------------------
+    # 3. Location (only free-typing field per D-08)
+    # ------------------------------------------------------------------
+    location_answer = questionary.text(
+        "City, State or ZIP code:",
+        style=HOUSE_STYLE,
+    ).ask()
+    if location_answer is None:
+        return None
+    location = location_answer.strip()
+    if not location:
+        console.print("[red]Location is required.[/red]")
+        return None
+
+    # ------------------------------------------------------------------
+    # 4. Radius
+    # ------------------------------------------------------------------
+    radius_answer = questionary.select(
+        "Search radius:",
+        choices=["5 miles", "10 miles", "25 miles", "50 miles", "100 miles"],
+        default="25 miles",
+        style=HOUSE_STYLE,
+        instruction="(Enter to skip)",
+    ).ask()
+    if radius_answer is None:
+        return None
+    radius_miles = int(radius_answer.split()[0])
+
+    # ------------------------------------------------------------------
+    # 5. ZIP Discovery
+    # ------------------------------------------------------------------
+    zip_codes: list[str] = []
+    excluded_zips: list[str] = []
+
+    with console.status("Discovering ZIP codes..."):
+        discovered = discover_zip_codes(location, radius_miles)
+
+    if discovered:
+        display_zips = discovered[:30]
+        console.print(
+            f"[green]Found {len(discovered)} ZIP code(s) within {radius_miles} miles of {location}.[/green]"
+        )
+
+        zip_choices = [
+            questionary.Choice(
+                title=f"{z.zipcode} — {z.city}, {z.state}",
+                value=z.zipcode,
+                checked=True,
+            )
+            for z in display_zips
+        ]
+
+        selected = questionary.checkbox(
+            "Select ZIP codes to include (uncheck to exclude):",
+            choices=zip_choices,
+            style=HOUSE_STYLE,
+            instruction="(Space to toggle, Enter to confirm)",
+        ).ask()
+        if selected is None:
+            return None
+
+        all_zip_strs = [z.zipcode for z in display_zips]
+        zip_codes = selected
+        excluded_zips = [z for z in all_zip_strs if z not in selected]
+    else:
+        console.print("[yellow]No ZIP codes found for that location — searching by location string.[/yellow]")
+
+    # ------------------------------------------------------------------
+    # 6. Price Range
+    # ------------------------------------------------------------------
+    price_answer = questionary.select(
+        "Price range:",
+        choices=[
+            "Any",
+            "Under $100k",
+            "$100k - $200k",
+            "$200k - $300k",
+            "$300k - $400k",
+            "$400k - $500k",
+            "$500k - $750k",
+            "$750k - $1M",
+            "$1M - $1.5M",
+            "Over $1.5M",
+        ],
+        style=HOUSE_STYLE,
+        instruction="(Enter to skip)",
+    ).ask()
+    if price_answer is None:
+        return None
+    price_min, price_max = _parse_price_range(price_answer)
+
+    # ------------------------------------------------------------------
+    # 7. Bedrooms
+    # ------------------------------------------------------------------
+    beds_answer = questionary.select(
+        "Bedrooms:",
+        choices=["Any", "1+", "2+", "3+", "4+", "5+"],
+        style=HOUSE_STYLE,
+        instruction="(Enter to skip)",
+    ).ask()
+    if beds_answer is None:
+        return None
+    bedrooms_min = None if beds_answer == "Any" else int(beds_answer[0])
+
+    # ------------------------------------------------------------------
+    # 8. Bathrooms
+    # ------------------------------------------------------------------
+    baths_answer = questionary.select(
+        "Bathrooms:",
+        choices=["Any", "1+", "1.5+", "2+", "2.5+", "3+"],
+        style=HOUSE_STYLE,
+        instruction="(Enter to skip)",
+    ).ask()
+    if baths_answer is None:
+        return None
+    bathrooms_min = None if baths_answer == "Any" else float(baths_answer.rstrip("+"))
+
+    # ------------------------------------------------------------------
+    # 9. Square Footage
+    # ------------------------------------------------------------------
+    sqft_answer = questionary.select(
+        "Square footage:",
+        choices=["Any", "Under 1,000", "1,000 - 1,500", "1,500 - 2,000", "2,000 - 3,000", "3,000 - 4,000", "Over 4,000"],
+        style=HOUSE_STYLE,
+        instruction="(Enter to skip)",
+    ).ask()
+    if sqft_answer is None:
+        return None
+    sqft_min, sqft_max = _parse_sqft_range(sqft_answer)
+
+    # ------------------------------------------------------------------
+    # 10. Lot Size
+    # ------------------------------------------------------------------
+    lot_answer = questionary.select(
+        "Lot size:",
+        choices=["Any", "Under 5,000 sqft", "5,000 - 10,000 sqft", "10,000 - 20,000 sqft", "Over 20,000 sqft", "Over 1 acre"],
+        style=HOUSE_STYLE,
+        instruction="(Enter to skip)",
+    ).ask()
+    if lot_answer is None:
+        return None
+    lot_sqft_min, lot_sqft_max = _parse_lot_range(lot_answer)
+
+    # ------------------------------------------------------------------
+    # 11. Year Built
+    # ------------------------------------------------------------------
+    year_answer = questionary.select(
+        "Year built:",
+        choices=["Any", "2020+", "2010+", "2000+", "1990+", "1980+", "1970 or older"],
+        style=HOUSE_STYLE,
+        instruction="(Enter to skip)",
+    ).ask()
+    if year_answer is None:
+        return None
+    year_built_min = _parse_year(year_answer)
+
+    # ------------------------------------------------------------------
+    # 12. Stories / Floors
+    # ------------------------------------------------------------------
+    stories_answer = questionary.select(
+        "Stories:",
+        choices=["Any", "1+", "2+", "3+"],
+        style=HOUSE_STYLE,
+        instruction="(Enter to skip)",
+    ).ask()
+    if stories_answer is None:
+        return None
+    stories_min = None if stories_answer == "Any" else int(stories_answer[0])
+
+    # ------------------------------------------------------------------
+    # 13. Basement
+    # ------------------------------------------------------------------
+    basement_answer = questionary.select(
+        "Basement:",
+        choices=["Don't care", "Must have", "No basement"],
+        style=HOUSE_STYLE,
+        instruction="(Enter to skip)",
+    ).ask()
+    if basement_answer is None:
+        return None
+    basement_map = {"Must have": True, "No basement": False, "Don't care": None}
+    has_basement = basement_map[basement_answer]
+
+    # ------------------------------------------------------------------
+    # 14. Garage
+    # ------------------------------------------------------------------
+    garage_answer = questionary.select(
+        "Garage:",
+        choices=["Don't care", "Must have", "No garage"],
+        style=HOUSE_STYLE,
+        instruction="(Enter to skip)",
+    ).ask()
+    if garage_answer is None:
+        return None
+    garage_map = {"Must have": True, "No garage": False, "Don't care": None}
+    has_garage = garage_map[garage_answer]
+
+    garage_spaces_min: Optional[int] = None
+    if has_garage is True:
+        spaces_answer = questionary.select(
+            "Minimum garage spaces:",
+            choices=["Any", "1+", "2+", "3+"],
+            style=HOUSE_STYLE,
+            instruction="(Enter to skip)",
+        ).ask()
+        if spaces_answer is None:
+            return None
+        garage_spaces_min = None if spaces_answer == "Any" else int(spaces_answer[0])
+
+    # ------------------------------------------------------------------
+    # 15. HOA
+    # ------------------------------------------------------------------
+    hoa_answer = questionary.select(
+        "HOA max:",
+        choices=["Any / No limit", "No HOA ($0)", "Up to $100/mo", "Up to $200/mo", "Up to $300/mo", "Up to $500/mo"],
+        style=HOUSE_STYLE,
+        instruction="(Enter to skip)",
+    ).ask()
+    if hoa_answer is None:
+        return None
+    hoa_max = _parse_hoa(hoa_answer)
+
+    # ------------------------------------------------------------------
+    # Build criteria
+    # ------------------------------------------------------------------
+    criteria = SearchCriteria(
+        location=location,
+        radius_miles=radius_miles,
+        zip_codes=zip_codes,
+        excluded_zips=excluded_zips,
+        listing_type=listing_type,
+        property_types=property_types,
+        price_min=price_min,
+        price_max=price_max,
+        bedrooms_min=bedrooms_min,
+        bathrooms_min=bathrooms_min,
+        sqft_min=sqft_min,
+        sqft_max=sqft_max,
+        lot_sqft_min=lot_sqft_min,
+        lot_sqft_max=lot_sqft_max,
+        year_built_min=year_built_min,
+        stories_min=stories_min,
+        has_basement=has_basement,
+        has_garage=has_garage,
+        garage_spaces_min=garage_spaces_min,
+        hoa_max=hoa_max,
+    )
+
+    # ------------------------------------------------------------------
+    # D-12: Summary panel + confirm
+    # ------------------------------------------------------------------
+    _display_summary(criteria)
+
+    confirm_answer = questionary.select(
+        "Search now?",
+        choices=["Yes", "Edit", "Cancel"],
+        style=HOUSE_STYLE,
+    ).ask()
+    if confirm_answer is None or confirm_answer == "Cancel":
+        return (criteria, "cancel")
+    if confirm_answer == "Edit":
+        return (criteria, "edit")
+    return (criteria, "yes")

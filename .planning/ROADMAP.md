@@ -29,7 +29,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. A complete home search (all 15 fields) can be configured and submitted using only arrow keys and Enter
   4. A Rich progress spinner is visible during the search scrape and the CLI stays interactive (does not freeze)
   5. Search results appear in a colorful Rich table with price, beds, baths, sqft, and address; pressing Enter or a key returns to main menu
-**Plans:** 3/4 plans executed
+**Plans:** 4/4 plans executed
 
 Plans:
 - [x] 01-01-PLAN.md — Fix FastAPI deprecation (FIX-02), add questionary/art deps, create TUI package with shared styles
@@ -46,7 +46,12 @@ Plans:
   2. The Settings menu lets a user add/remove email recipients and set a default search location without typing in a free-form prompt
   3. The SMTP wizard walks through server, port, email, and password fields with a test-send step, and saves credentials to `~/.homerfindr/config.json`
   4. Saved searches are browsable from the main menu — user can view, run, toggle active/inactive, and delete via arrow-key list
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — Config module (load/save JSON), SMTP wizard with provider presets and test-send, first-run setup wizard
+- [ ] 02-02-PLAN.md — Settings page (Email/Defaults/About sub-pages), saved searches browser (table + Run Now/Toggle/Rename/Delete)
+- [ ] 02-03-PLAN.md — Wire all Phase 2 modules into menu.py, end-to-end verification checkpoint
 
 ### Phase 3: Web UI Redesign
 **Goal**: The web dashboard looks and feels like a professional real estate app — clean property cards, sortable results, and accurate data
@@ -80,7 +85,7 @@ Note: Phase 3 is independent of Phase 2 and can be worked in parallel with Phase
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Interactive CLI Core | 3/4 | In Progress|  |
-| 2. CLI Settings and Configuration | 0/TBD | Not started | - |
+| 1. Interactive CLI Core | 4/4 | Complete |  |
+| 2. CLI Settings and Configuration | 0/3 | Not started | - |
 | 3. Web UI Redesign | 0/TBD | Not started | - |
 | 4. Bridge and Desktop Packaging | 0/TBD | Not started | - |

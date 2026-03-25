@@ -33,8 +33,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 Plans:
 - [x] 01-01-PLAN.md — Fix FastAPI deprecation (FIX-02), add questionary/art deps, create TUI package with shared styles
-- [ ] 01-02-PLAN.md — ASCII art splash screen with typewriter animation, main menu loop, entry point rewiring
-- [ ] 01-03-PLAN.md — 15-field search wizard with arrow-key navigation and pre-built option lists
+- [x] 01-02-PLAN.md — ASCII art splash screen with typewriter animation, main menu loop, entry point rewiring
+- [x] 01-03-PLAN.md — 15-field search wizard with arrow-key navigation and pre-built option lists
 - [ ] 01-04-PLAN.md — Non-blocking search with spinner, colorful results table, URL opening, save flow
 
 ### Phase 2: CLI Settings and Configuration

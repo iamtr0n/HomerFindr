@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 01-interactive-cli-core-01-PLAN.md
-last_updated: "2026-03-25T21:49:26.237Z"
+stopped_at: Completed 01-interactive-cli-core-02-PLAN.md
+last_updated: "2026-03-25T21:55:29.368Z"
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 4
-  completed_plans: 1
+  completed_plans: 3
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 01 (interactive-cli-core) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 
 ## Performance Metrics
 
@@ -47,6 +47,7 @@ Plan: 2 of 4
 
 *Updated after each plan completion*
 | Phase 01-interactive-cli-core P01 | 3 | 2 tasks | 4 files |
+| Phase 01-interactive-cli-core P02 | 3 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -61,6 +62,8 @@ Recent decisions affecting current work:
 - [Init]: Use pipx for global CLI install; Platypus for macOS .app (not PyInstaller)
 - [Phase 01-interactive-cli-core]: Use asynccontextmanager lifespan instead of on_event in FastAPI routes to eliminate DeprecationWarnings that corrupt Rich output
 - [Phase 01-interactive-cli-core]: Centralize questionary Style and Rich Console in homesearch/tui/styles.py as single import source for all TUI modules (HOUSE_STYLE, console, COLOR_* constants)
+- [Phase 01-interactive-cli-core]: Rich Live context must exit before questionary fires — both take terminal ownership, sequencing critical for splash-to-menu transition
+- [Phase 01-interactive-cli-core]: console.clear() after splash for clean transition; menu loop uses while True with KeyboardInterrupt for graceful Ctrl+C exit
 
 ### Pending Todos
 
@@ -74,6 +77,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T21:49:26.236Z
-Stopped at: Completed 01-interactive-cli-core-01-PLAN.md
+Last session: 2026-03-25T21:55:29.367Z
+Stopped at: Completed 01-interactive-cli-core-02-PLAN.md
 Resume file: None

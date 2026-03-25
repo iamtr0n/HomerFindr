@@ -1,5 +1,6 @@
 """FastAPI REST API for the web frontend."""
 
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
@@ -15,7 +16,16 @@ from homesearch.services.search_service import run_search
 from homesearch.services.zip_service import discover_zip_codes
 from homesearch.models import ZipInfo
 
-app = FastAPI(title="HomeSearch API", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    db.init_db()
+    yield
+    # Shutdown (Phase 2 will add stop_scheduler here)
+
+
+app = FastAPI(title="HomeSearch API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -23,11 +33,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Initialize DB on startup
-@app.on_event("startup")
-def startup():
-    db.init_db()
 
 
 # --- Search endpoints ---

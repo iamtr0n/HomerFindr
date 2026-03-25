@@ -7,10 +7,10 @@
 
 ### Bug Fixes & Cleanup
 
-- [ ] **FIX-01**: Fix double `/api` prefix causing 404 on preview search endpoint
+- [x] **FIX-01**: Fix double `/api` prefix causing 404 on preview search endpoint
 - [x] **FIX-02**: Fix FastAPI startup deprecation warnings (lifespan migration)
-- [ ] **FIX-03**: Fix `result_count` always returning zero in search results
-- [ ] **FIX-04**: Pin Tailwind CSS version to v3.x to prevent v4 config breaking changes
+- [x] **FIX-03**: Fix `result_count` always returning zero in search results
+- [x] **FIX-04**: Pin Tailwind CSS version to v3.x to prevent v4 config breaking changes
 
 ### CLI Core
 
@@ -41,7 +41,7 @@
 - [ ] **WEB-03**: Dashboard home page showing saved searches overview and recent results
 - [ ] **WEB-04**: Sortable/filterable search results grid
 - [ ] **WEB-05**: Responsive design that works on mobile browsers (for sharing with friends/family)
-- [ ] **WEB-06**: Professional color scheme and typography (clean real estate aesthetic)
+- [x] **WEB-06**: Professional color scheme and typography (clean real estate aesthetic)
 
 ### Desktop & Packaging
 
@@ -53,9 +53,9 @@
 
 ### Cross-Cutting
 
-- [ ] **XC-01**: Listing deduplication across providers (same property from Realtor.com and Redfin shown once)
-- [ ] **XC-02**: Provider health checks with visible error messages when a provider returns 403/errors
-- [ ] **XC-03**: Consistent branding — "HomerFindr" name and house theme across CLI and web
+- [x] **XC-01**: Listing deduplication across providers (same property from Realtor.com and Redfin shown once)
+- [x] **XC-02**: Provider health checks with visible error messages when a provider returns 403/errors
+- [x] **XC-03**: Consistent branding — "HomerFindr" name and house theme across CLI and web
 
 ## v2 Requirements
 
@@ -86,10 +86,10 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FIX-01 | Phase 3 | Pending |
+| FIX-01 | Phase 3 | Complete |
 | FIX-02 | Phase 1 | Complete |
-| FIX-03 | Phase 3 | Pending |
-| FIX-04 | Phase 3 | Pending |
+| FIX-03 | Phase 3 | Complete |
+| FIX-04 | Phase 3 | Complete |
 | CLI-01 | Phase 1 | Complete |
 | CLI-02 | Phase 1 | Complete |
 | CLI-03 | Phase 1 | Complete |
@@ -111,15 +111,15 @@
 | WEB-03 | Phase 3 | Pending |
 | WEB-04 | Phase 3 | Pending |
 | WEB-05 | Phase 3 | Pending |
-| WEB-06 | Phase 3 | Pending |
+| WEB-06 | Phase 3 | Complete |
 | PKG-01 | Phase 4 | Pending |
 | PKG-02 | Phase 4 | Pending |
 | PKG-03 | Phase 4 | Pending |
 | PKG-04 | Phase 4 | Pending |
 | PKG-05 | Phase 4 | Pending |
-| XC-01 | Phase 3 | Pending |
-| XC-02 | Phase 3 | Pending |
-| XC-03 | Phase 3 | Pending |
+| XC-01 | Phase 3 | Complete |
+| XC-02 | Phase 3 | Complete |
+| XC-03 | Phase 3 | Complete |
 
 **Coverage:**
 - v1 requirements: 34 total

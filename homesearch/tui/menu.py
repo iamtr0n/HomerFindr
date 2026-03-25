@@ -11,9 +11,15 @@ def tui_main():
 
     Shows splash, then loops the main menu until Exit or Ctrl+C.
     Per D-03: splash on every launch.
+    Per D-06: first-run check triggers wizard when no config exists.
     Per D-07: return to menu after any action (while True loop).
     """
     show_splash()
+    # First-run check — triggers when no config file exists (D-06)
+    from homesearch.tui.config import config_exists
+    from homesearch.tui.first_run import run_first_run_wizard
+    if not config_exists():
+        run_first_run_wizard()
     run_menu_loop()
 
 
@@ -65,40 +71,15 @@ def _handle_new_search():
 
 
 def _handle_saved_searches():
-    """Browse saved searches — pick one to run again."""
-    from homesearch import database as db
-    from homesearch.tui.results import execute_search_with_spinner, display_results
-
-    db.init_db()
-    searches = db.get_saved_searches()
-
-    if not searches:
-        console.print("[yellow]No saved searches yet. Run a New Search first.[/yellow]")
-        return
-
-    choices = [f"{s.name} ({s.criteria.location or 'N/A'})" for s in searches]
-    choices.append("\u21a9  Back to menu")
-
-    pick = questionary.select(
-        "Saved Searches — select to run:",
-        choices=choices,
-        style=HOUSE_STYLE,
-    ).ask()
-
-    if pick is None or "Back to menu" in pick:
-        return
-
-    idx = choices.index(pick)
-    if idx < len(searches):
-        selected = searches[idx]
-        console.print(f"[cyan]Running: {selected.name}[/cyan]")
-        results = execute_search_with_spinner(selected.criteria)
-        display_results(results, selected.criteria)
+    """Browse saved searches — full management interface."""
+    from homesearch.tui.saved_browser import show_saved_searches_browser
+    show_saved_searches_browser()
 
 
 def _handle_settings():
-    """Stub — Phase 2 implements settings."""
-    console.print("[dim]Settings will be available in a future update.[/dim]")
+    """Open the Settings page with Email, Search Defaults, and About sub-pages."""
+    from homesearch.tui.settings import show_settings_menu
+    show_settings_menu()
 
 
 def _handle_web_ui():

@@ -51,22 +51,23 @@ def run_menu_loop():
 
 
 def _handle_new_search():
-    """Run the 15-field search wizard."""
+    """Run the full search flow: wizard -> spinner -> results -> save."""
     from homesearch.tui.wizard import run_search_wizard
+    from homesearch.tui.results import execute_search_with_spinner, display_results
 
     criteria = run_search_wizard()
     if criteria is None:
         console.print("[dim]Search cancelled.[/dim]")
         return
 
-    # Search execution will be wired in Plan 04
-    console.print(f"[green]Search criteria ready for: {criteria.location}[/green]")
-    console.print("[yellow]Search execution coming in next plan...[/yellow]")
+    results = execute_search_with_spinner(criteria)
+    display_results(results, criteria)
 
 
 def _handle_saved_searches():
-    """Basic saved searches view — read-only list for Phase 1."""
+    """Browse saved searches — pick one to run again."""
     from homesearch import database as db
+    from homesearch.tui.results import execute_search_with_spinner, display_results
 
     db.init_db()
     searches = db.get_saved_searches()
@@ -75,12 +76,11 @@ def _handle_saved_searches():
         console.print("[yellow]No saved searches yet. Run a New Search first.[/yellow]")
         return
 
-    # Show list and let user pick one to run
     choices = [f"{s.name} ({s.criteria.location or 'N/A'})" for s in searches]
     choices.append("\u21a9  Back to menu")
 
     pick = questionary.select(
-        "Saved Searches:",
+        "Saved Searches — select to run:",
         choices=choices,
         style=HOUSE_STYLE,
     ).ask()
@@ -88,11 +88,12 @@ def _handle_saved_searches():
     if pick is None or "Back to menu" in pick:
         return
 
-    # Find matching search and run it (Plan 04 will add proper execution)
     idx = choices.index(pick)
     if idx < len(searches):
-        console.print(f"[cyan]Selected: {searches[idx].name}[/cyan]")
-        console.print("[yellow]Search execution coming in Plan 04...[/yellow]")
+        selected = searches[idx]
+        console.print(f"[cyan]Running: {selected.name}[/cyan]")
+        results = execute_search_with_spinner(selected.criteria)
+        display_results(results, selected.criteria)
 
 
 def _handle_settings():

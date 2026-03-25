@@ -27,12 +27,12 @@
 ### CLI Settings & Configuration
 
 - [ ] **CFG-01**: Settings page accessible from main menu — view/edit all configuration
-- [ ] **CFG-02**: SMTP setup wizard with guided arrow-key flow (server, port, email, password, test send)
+- [x] **CFG-02**: SMTP setup wizard with guided arrow-key flow (server, port, email, password, test send)
 - [ ] **CFG-03**: Email recipients management — add/remove recipients via arrow-key interface
 - [ ] **CFG-04**: Search defaults configuration — set default location, radius, price range
-- [ ] **CFG-05**: First-run experience — guided setup on first launch (location preferences, optional SMTP)
+- [x] **CFG-05**: First-run experience — guided setup on first launch (location preferences, optional SMTP)
 - [ ] **CFG-06**: Saved searches browser — arrow-key list to view, run, toggle active/inactive, delete
-- [ ] **CFG-07**: Configuration stored in user-friendly location (~/.homerfindr/config.json)
+- [x] **CFG-07**: Configuration stored in user-friendly location (~/.homerfindr/config.json)
 
 ### Web UI
 
@@ -100,12 +100,12 @@
 | CLI-08 | Phase 1 | Complete |
 | CLI-09 | Phase 1 | Complete |
 | CFG-01 | Phase 2 | Pending |
-| CFG-02 | Phase 2 | Pending |
+| CFG-02 | Phase 2 | Complete |
 | CFG-03 | Phase 2 | Pending |
 | CFG-04 | Phase 2 | Pending |
-| CFG-05 | Phase 2 | Pending |
+| CFG-05 | Phase 2 | Complete |
 | CFG-06 | Phase 2 | Pending |
-| CFG-07 | Phase 2 | Pending |
+| CFG-07 | Phase 2 | Complete |
 | WEB-01 | Phase 3 | Pending |
 | WEB-02 | Phase 3 | Pending |
 | WEB-03 | Phase 3 | Pending |

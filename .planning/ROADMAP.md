@@ -46,10 +46,10 @@ Plans:
   2. The Settings menu lets a user add/remove email recipients and set a default search location without typing in a free-form prompt
   3. The SMTP wizard walks through server, port, email, and password fields with a test-send step, and saves credentials to `~/.homerfindr/config.json`
   4. Saved searches are browsable from the main menu — user can view, run, toggle active/inactive, and delete via arrow-key list
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 
 Plans:
-- [ ] 02-01-PLAN.md — Config module (load/save JSON), SMTP wizard with provider presets and test-send, first-run setup wizard
+- [x] 02-01-PLAN.md — Config module (load/save JSON), SMTP wizard with provider presets and test-send, first-run setup wizard
 - [ ] 02-02-PLAN.md — Settings page (Email/Defaults/About sub-pages), saved searches browser (table + Run Now/Toggle/Rename/Delete)
 - [ ] 02-03-PLAN.md — Wire all Phase 2 modules into menu.py, end-to-end verification checkpoint
 
@@ -86,6 +86,6 @@ Note: Phase 3 is independent of Phase 2 and can be worked in parallel with Phase
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Interactive CLI Core | 4/4 | Complete |  |
-| 2. CLI Settings and Configuration | 0/3 | Not started | - |
+| 2. CLI Settings and Configuration | 1/3 | In Progress|  |
 | 3. Web UI Redesign | 0/TBD | Not started | - |
 | 4. Bridge and Desktop Packaging | 0/TBD | Not started | - |

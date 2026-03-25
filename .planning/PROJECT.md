@@ -24,11 +24,12 @@ Find homes fast across all platforms without juggling multiple websites — zero
 
 ### Active
 
-- [ ] Arrow-key interactive CLI — all navigation via arrows + Enter, zero typing for searches
-- [ ] ASCII art house-themed splash/loading screen — colorful, fun, impressive
-- [ ] Main menu system — Search, Saved Searches, Settings, Launch Web UI, Exit
-- [ ] Settings/Options page in CLI — configure SMTP, email recipients, search defaults
-- [ ] SMTP setup wizard in CLI — guided arrow-key flow to configure email
+- ✓ Arrow-key interactive CLI — all navigation via arrows + Enter, zero typing for searches (Validated in Phase 01)
+- ✓ ASCII art house-themed splash/loading screen — colorful, fun, impressive (Validated in Phase 01)
+- ✓ Main menu system — Search, Saved Searches, Settings, Launch Web UI, Exit (Validated in Phase 01)
+- ✓ Settings/Options page in CLI — configure SMTP, email recipients, search defaults (Validated in Phase 02)
+- ✓ SMTP setup wizard in CLI — guided arrow-key flow to configure email (Validated in Phase 02)
+- ✓ First-run experience — guided setup on first launch (location, preferences, optional SMTP) (Validated in Phase 02)
 - [ ] Desktop launchable — global `homerfindr` CLI command + macOS .app/dock shortcut
 - [ ] Colorful/fun CLI experience — Rich-powered colors, progress bars, animated house loading
 - [ ] Web UI redesign — clean, minimal, Zillow/Redfin-inspired professional dashboard
@@ -36,7 +37,6 @@ Find homes fast across all platforms without juggling multiple websites — zero
 - [ ] Web dashboard — saved searches overview, recent results, quick actions
 - [ ] Search results display — sortable, filterable grid/list in both CLI and web
 - [ ] Streamlined search flow — pre-built option lists for every field (no free typing)
-- [ ] First-run experience — guided setup on first launch (location, preferences, optional SMTP)
 
 ### Out of Scope
 

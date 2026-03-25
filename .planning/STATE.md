@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 01-interactive-cli-core-02-PLAN.md
-last_updated: "2026-03-25T21:55:29.368Z"
+stopped_at: Completed 01-interactive-cli-core-03-PLAN.md
+last_updated: "2026-03-25T21:55:58.680Z"
 progress:
   total_phases: 4
   completed_phases: 0
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 01 (interactive-cli-core) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 
 ## Performance Metrics
 
@@ -48,6 +48,7 @@ Plan: 3 of 4
 *Updated after each plan completion*
 | Phase 01-interactive-cli-core P01 | 3 | 2 tasks | 4 files |
 | Phase 01-interactive-cli-core P02 | 3 | 2 tasks | 3 files |
+| Phase 01-interactive-cli-core P03 | 4 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -64,6 +65,8 @@ Recent decisions affecting current work:
 - [Phase 01-interactive-cli-core]: Centralize questionary Style and Rich Console in homesearch/tui/styles.py as single import source for all TUI modules (HOUSE_STYLE, console, COLOR_* constants)
 - [Phase 01-interactive-cli-core]: Rich Live context must exit before questionary fires — both take terminal ownership, sequencing critical for splash-to-menu transition
 - [Phase 01-interactive-cli-core]: console.clear() after splash for clean transition; menu loop uses while True with KeyboardInterrupt for graceful Ctrl+C exit
+- [Phase 01-interactive-cli-core]: Wizard Edit action loops _run_wizard_once() via while True in run_search_wizard() — no separate edit state needed
+- [Phase 01-interactive-cli-core]: ZIP exclusion computed as set difference from displayed ZIPs; checkbox pre-checked approach (uncheck to exclude) per Research recommendation
 
 ### Pending Todos
 
@@ -77,6 +80,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T21:55:29.367Z
-Stopped at: Completed 01-interactive-cli-core-02-PLAN.md
+Last session: 2026-03-25T21:55:58.679Z
+Stopped at: Completed 01-interactive-cli-core-03-PLAN.md
 Resume file: None

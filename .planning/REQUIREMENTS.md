@@ -14,15 +14,15 @@
 
 ### CLI Core
 
-- [ ] **CLI-01**: ASCII art house-themed splash screen with gradient colors on launch
-- [ ] **CLI-02**: Animated loading sequence with house/building ASCII art during startup
-- [ ] **CLI-03**: Arrow-key main menu with options: New Search, Saved Searches, Settings, Launch Web UI, Exit
-- [ ] **CLI-04**: Arrow-key search wizard — all 15 fields (type, property, location, radius, ZIP discovery, price, beds, baths, sqft, lot, year, floors, basement, garage, HOA) navigable with arrows + Enter only
-- [ ] **CLI-05**: Pre-built option lists for every search field (no free typing required)
+- [x] **CLI-01**: ASCII art house-themed splash screen with gradient colors on launch
+- [x] **CLI-02**: Animated loading sequence with house/building ASCII art during startup
+- [x] **CLI-03**: Arrow-key main menu with options: New Search, Saved Searches, Settings, Launch Web UI, Exit
+- [x] **CLI-04**: Arrow-key search wizard — all 15 fields (type, property, location, radius, ZIP discovery, price, beds, baths, sqft, lot, year, floors, basement, garage, HOA) navigable with arrows + Enter only
+- [x] **CLI-05**: Pre-built option lists for every search field (no free typing required)
 - [ ] **CLI-06**: Animated search progress with Rich spinners/progress bars while scraping providers
 - [ ] **CLI-07**: Non-blocking search execution (background thread) so CLI stays responsive
 - [ ] **CLI-08**: Colorful search results display with Rich tables/panels showing key property details
-- [ ] **CLI-09**: Return to main menu after any action completes
+- [x] **CLI-09**: Return to main menu after any action completes
 
 ### CLI Settings & Configuration
 
@@ -90,15 +90,15 @@
 | FIX-02 | Phase 1 | Complete |
 | FIX-03 | Phase 3 | Pending |
 | FIX-04 | Phase 3 | Pending |
-| CLI-01 | Phase 1 | Pending |
-| CLI-02 | Phase 1 | Pending |
-| CLI-03 | Phase 1 | Pending |
-| CLI-04 | Phase 1 | Pending |
-| CLI-05 | Phase 1 | Pending |
+| CLI-01 | Phase 1 | Complete |
+| CLI-02 | Phase 1 | Complete |
+| CLI-03 | Phase 1 | Complete |
+| CLI-04 | Phase 1 | Complete |
+| CLI-05 | Phase 1 | Complete |
 | CLI-06 | Phase 1 | Pending |
 | CLI-07 | Phase 1 | Pending |
 | CLI-08 | Phase 1 | Pending |
-| CLI-09 | Phase 1 | Pending |
+| CLI-09 | Phase 1 | Complete |
 | CFG-01 | Phase 2 | Pending |
 | CFG-02 | Phase 2 | Pending |
 | CFG-03 | Phase 2 | Pending |

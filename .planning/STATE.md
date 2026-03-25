@@ -2,16 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: planning
-stopped_at: Phase 1 plans created
-last_updated: "2026-03-25T21:43:53.441Z"
-last_activity: 2026-03-25 — Roadmap created, all 34 v1 requirements mapped to 4 phases
+status: unknown
+stopped_at: Completed 01-interactive-cli-core-01-PLAN.md
+last_updated: "2026-03-25T21:49:26.237Z"
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 4
-  completed_plans: 0
-  percent: 0
+  completed_plans: 1
 ---
 
 # Project State
@@ -21,16 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Find homes fast across all platforms without juggling multiple websites — zero typing required in the CLI
-**Current focus:** Phase 1 — Interactive CLI Core
+**Current focus:** Phase 01 — interactive-cli-core
 
 ## Current Position
 
-Phase: 1 of 4 (Interactive CLI Core)
-Plan: 0 of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-03-25 — Roadmap created, all 34 v1 requirements mapped to 4 phases
-
-Progress: [░░░░░░░░░░] 0%
+Phase: 01 (interactive-cli-core) — EXECUTING
+Plan: 2 of 4
 
 ## Performance Metrics
 
@@ -52,6 +46,7 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: —
 
 *Updated after each plan completion*
+| Phase 01-interactive-cli-core P01 | 3 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -64,6 +59,8 @@ Recent decisions affecting current work:
 - [Init]: Use art 6.5 for ASCII splash (simpler API than pyfiglet)
 - [Init]: Use shadcn/ui for web component redesign (owned code, no runtime dependency)
 - [Init]: Use pipx for global CLI install; Platypus for macOS .app (not PyInstaller)
+- [Phase 01-interactive-cli-core]: Use asynccontextmanager lifespan instead of on_event in FastAPI routes to eliminate DeprecationWarnings that corrupt Rich output
+- [Phase 01-interactive-cli-core]: Centralize questionary Style and Rich Console in homesearch/tui/styles.py as single import source for all TUI modules (HOUSE_STYLE, console, COLOR_* constants)
 
 ### Pending Todos
 
@@ -77,6 +74,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T21:43:53.439Z
-Stopped at: Phase 1 plans created
-Resume file: .planning/phases/01-interactive-cli-core/01-01-PLAN.md
+Last session: 2026-03-25T21:49:26.236Z
+Stopped at: Completed 01-interactive-cli-core-01-PLAN.md
+Resume file: None

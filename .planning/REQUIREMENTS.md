@@ -8,7 +8,7 @@
 ### Bug Fixes & Cleanup
 
 - [ ] **FIX-01**: Fix double `/api` prefix causing 404 on preview search endpoint
-- [ ] **FIX-02**: Fix FastAPI startup deprecation warnings (lifespan migration)
+- [x] **FIX-02**: Fix FastAPI startup deprecation warnings (lifespan migration)
 - [ ] **FIX-03**: Fix `result_count` always returning zero in search results
 - [ ] **FIX-04**: Pin Tailwind CSS version to v3.x to prevent v4 config breaking changes
 
@@ -87,7 +87,7 @@
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | FIX-01 | Phase 3 | Pending |
-| FIX-02 | Phase 1 | Pending |
+| FIX-02 | Phase 1 | Complete |
 | FIX-03 | Phase 3 | Pending |
 | FIX-04 | Phase 3 | Pending |
 | CLI-01 | Phase 1 | Pending |

@@ -63,7 +63,13 @@ Plans:
   3. Results can be sorted (price, sqft, beds) and filtered (price range, min beds, min baths) from the dashboard
   4. The dashboard home page shows saved searches and recent results; the design uses a clean real estate color scheme with professional typography
   5. When a provider returns an error or 403, a visible error message tells the user which provider failed rather than silently returning empty results
-**Plans**: TBD
+**Plans:** 4 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — Fix bugs (FIX-01, FIX-03, FIX-04), provider error collection (XC-02 backend), enhanced dedup (XC-01)
+- [ ] 03-02-PLAN.md — Design system foundation: Tailwind brand palette, shadcn/ui primitives (Card/Badge/Button), HomerFindr branding (XC-03)
+- [ ] 03-03-PLAN.md — Redesign PropertyCard and Dashboard with shadcn/ui, stat header, recent activity section (WEB-01, WEB-02, WEB-03, WEB-05)
+- [ ] 03-04-PLAN.md — Client-side filter controls for SearchResults (WEB-04), provider error banners on both search pages (XC-02 frontend, WEB-05)
 
 ### Phase 4: Bridge and Desktop Packaging
 **Goal**: HomerFindr feels like a real desktop application — launchable from anywhere, with CLI and web UI connected as one tool
@@ -87,5 +93,5 @@ Note: Phase 3 is independent of Phase 2 and can be worked in parallel with Phase
 |-------|----------------|--------|-----------|
 | 1. Interactive CLI Core | 4/4 | Complete |  |
 | 2. CLI Settings and Configuration | 1/3 | In Progress|  |
-| 3. Web UI Redesign | 0/TBD | Not started | - |
+| 3. Web UI Redesign | 0/4 | Not started | - |
 | 4. Bridge and Desktop Packaging | 0/TBD | Not started | - |

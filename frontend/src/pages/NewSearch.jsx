@@ -9,7 +9,8 @@ export default function NewSearch() {
   const navigate = useNavigate()
   const [results, setResults] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [sortBy, setSortBy] = useState('price_asc')
+  const [sortBy, setSortBy] = useState('best_match')
+  const [visibleCount, setVisibleCount] = useState(50)
   const [providerErrors, setProviderErrors] = useState([])
   const [progress, setProgress] = useState(null) // { current, total, location }
 
@@ -18,6 +19,7 @@ export default function NewSearch() {
     setResults(null)
     setProgress(null)
     setProviderErrors([])
+    setVisibleCount(50)
 
     try {
       await streamSearch(criteria, {
@@ -44,7 +46,15 @@ export default function NewSearch() {
   const sortedResults = () => {
     if (!results?.results) return []
     const list = [...results.results]
+    const perfectScore = Math.max(...list.map(r => r.match_score || 0), 0)
     switch (sortBy) {
+      case 'best_match': return list.sort((a, b) => {
+        const aGold = (a.match_score || 0) >= perfectScore && perfectScore > 0 ? 1 : 0
+        const bGold = (b.match_score || 0) >= perfectScore && perfectScore > 0 ? 1 : 0
+        if (bGold !== aGold) return bGold - aGold
+        if ((b.match_score || 0) !== (a.match_score || 0)) return (b.match_score || 0) - (a.match_score || 0)
+        return (a.price || 0) - (b.price || 0)
+      })
       case 'price_asc': return list.sort((a, b) => (a.price || 0) - (b.price || 0))
       case 'price_desc': return list.sort((a, b) => (b.price || 0) - (a.price || 0))
       case 'sqft_desc': return list.sort((a, b) => (b.sqft || 0) - (a.sqft || 0))
@@ -96,6 +106,13 @@ export default function NewSearch() {
 
       {results && !loading && (
         <div className="mt-6">
+          <button
+            onClick={() => setResults(null)}
+            className="text-sm text-blue-600 hover:text-blue-800 mb-4"
+          >
+            &larr; Back to search
+          </button>
+
           <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
             <h2 className="text-lg font-semibold text-slate-800">
               {results.total} Properties Found
@@ -106,6 +123,7 @@ export default function NewSearch() {
               onChange={(e) => setSortBy(e.target.value)}
               className="py-1.5 px-3 border border-slate-200 rounded-lg text-sm"
             >
+              <option value="best_match">Best Match</option>
               <option value="price_asc">Price: Low to High</option>
               <option value="price_desc">Price: High to Low</option>
               <option value="sqft_desc">Largest First</option>
@@ -115,13 +133,43 @@ export default function NewSearch() {
 
           {results.total === 0 ? (
             <p className="text-center text-slate-500 py-8">No properties match your criteria. Try adjusting your filters.</p>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {sortedResults().map((listing, i) => (
-                <PropertyCard key={`${listing.source}-${listing.source_id}-${i}`} listing={listing} />
-              ))}
-            </div>
-          )}
+          ) : (() => {
+            const sorted = sortedResults()
+            const perfectScore = Math.max(...sorted.map(r => r.match_score || 0), 0)
+            const goldStarCount = sorted.filter(r => (r.match_score || 0) >= perfectScore && perfectScore > 0).length
+            const visible = sorted.slice(0, visibleCount)
+            return (
+              <>
+                {goldStarCount > 0 && (
+                  <p className="text-sm font-medium text-amber-700 mb-3">
+                    ⭐ {goldStarCount} Perfect Match{goldStarCount !== 1 ? 'es' : ''}
+                  </p>
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {visible.map((listing, i) => {
+                    const isGoldStar = (listing.match_score || 0) >= perfectScore && perfectScore > 0
+                    return (
+                      <PropertyCard
+                        key={`${listing.source}-${listing.source_id}-${i}`}
+                        listing={listing}
+                        isGoldStar={isGoldStar}
+                      />
+                    )
+                  })}
+                </div>
+                {sorted.length > visibleCount && (
+                  <div className="text-center mt-6">
+                    <button
+                      onClick={() => setVisibleCount(v => v + 50)}
+                      className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                    >
+                      Showing {visibleCount} of {results.total} — Load 50 more
+                    </button>
+                  </div>
+                )}
+              </>
+            )
+          })()}
         </div>
       )}
     </div>

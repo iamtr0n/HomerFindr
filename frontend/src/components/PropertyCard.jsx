@@ -4,11 +4,11 @@ import { Card, CardContent } from './ui/Card'
 import { Badge } from './ui/Badge'
 import { Button } from './ui/Button'
 
-export default function PropertyCard({ listing }) {
+export default function PropertyCard({ listing, isGoldStar = false }) {
   const {
     address, city, state, price, bedrooms, bathrooms, sqft, year_built,
     has_garage, has_basement, stories, hoa_monthly, photo_url, source_url,
-    source, zip_code, property_type,
+    source, zip_code, property_type, match_badges,
   } = listing
 
   const [imgLoaded, setImgLoaded] = useState(false)
@@ -26,7 +26,7 @@ export default function PropertyCard({ listing }) {
   const fullLocation = [locationStr, zip_code].filter(Boolean).join(' ')
 
   return (
-    <Card className="overflow-hidden hover:shadow-md transition-shadow">
+    <Card className={`overflow-hidden hover:shadow-md transition-shadow ${isGoldStar ? 'ring-2 ring-amber-400 border-amber-300' : ''}`}>
       {/* Photo */}
       <a href={source_url || '#'} target="_blank" rel="noopener noreferrer" className="relative block">
         {photo_url ? (
@@ -50,6 +50,11 @@ export default function PropertyCard({ listing }) {
           <Home size={28} />
           <span className="text-xs">No Photo Available</span>
         </div>
+        {isGoldStar && (
+          <Badge className="absolute top-2 left-2 bg-amber-400 text-amber-900 shadow-sm">
+            &#11088; Perfect Match
+          </Badge>
+        )}
         <Badge variant="secondary" className="absolute top-2 right-2 capitalize shadow-sm">
           {source}
         </Badge>
@@ -79,6 +84,17 @@ export default function PropertyCard({ listing }) {
         <p className="text-sm text-slate-500 line-clamp-1 mb-2">{address}</p>
         {fullLocation && (
           <p className="text-xs text-slate-400 mb-3">{fullLocation}</p>
+        )}
+
+        {/* Match badges */}
+        {match_badges && match_badges.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-3">
+            {match_badges.map((badge) => (
+              <span key={badge} className="px-2 py-0.5 text-xs rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                {badge}
+              </span>
+            ))}
+          </div>
         )}
 
         {/* Features */}

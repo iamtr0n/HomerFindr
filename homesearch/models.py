@@ -13,6 +13,7 @@ class ListingType(str, Enum):
     SALE = "sale"
     RENT = "rent"
     SOLD = "sold"
+    COMING_SOON = "coming_soon"
 
 
 class PropertyType(str, Enum):
@@ -59,6 +60,11 @@ class SearchCriteria(BaseModel):
 
     hoa_max: Optional[float] = None  # Max monthly HOA
 
+    has_fireplace: Optional[bool] = None
+    has_ac: Optional[bool] = None
+    heat_type: Optional[str] = None  # "any", "gas", "electric", "radiant", None
+    has_pool: Optional[bool] = None
+
 
 class Listing(BaseModel):
     """A normalized property listing from any source."""
@@ -81,6 +87,10 @@ class Listing(BaseModel):
     has_garage: Optional[bool] = None
     garage_spaces: Optional[int] = None
     has_basement: Optional[bool] = None
+    has_fireplace: Optional[bool] = None
+    has_ac: Optional[bool] = None
+    heat_type: Optional[str] = None  # Detected: "gas", "electric", "radiant", "forced air", etc.
+    has_pool: Optional[bool] = None
     year_built: Optional[int] = None
     hoa_monthly: Optional[float] = None
     latitude: Optional[float] = None

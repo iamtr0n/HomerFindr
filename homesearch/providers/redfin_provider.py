@@ -85,6 +85,8 @@ class RedfinProvider(BaseProvider):
             return 2
         if criteria.listing_type == ListingType.SOLD:
             return 3
+        if criteria.listing_type == ListingType.COMING_SOON:
+            return 4
         return 1  # For sale
 
     def _home_to_listing(self, home: dict, criteria: SearchCriteria) -> Listing | None:
@@ -131,6 +133,8 @@ class RedfinProvider(BaseProvider):
                 lt = "rent"
             elif criteria.listing_type == ListingType.SOLD:
                 lt = "sold"
+            elif criteria.listing_type == ListingType.COMING_SOON:
+                lt = "coming_soon"
 
             return Listing(
                 source="redfin",

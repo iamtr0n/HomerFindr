@@ -145,6 +145,15 @@ def _display_summary(criteria: SearchCriteria) -> None:
         table.add_row("Garage", "Required" if criteria.has_garage else "No garage")
     add("Min garage spaces", criteria.garage_spaces_min)
 
+    if criteria.has_fireplace is not None:
+        table.add_row("Fireplace", "Required" if criteria.has_fireplace else "No fireplace")
+    if criteria.has_ac is not None:
+        table.add_row("AC", "Required" if criteria.has_ac else "No AC")
+    if criteria.heat_type is not None:
+        table.add_row("Heat type", criteria.heat_type.title())
+    if criteria.has_pool is not None:
+        table.add_row("Pool", "Required" if criteria.has_pool else "No pool")
+
     if criteria.hoa_max is not None:
         label = "$0 (No HOA)" if criteria.hoa_max == 0.0 else f"Up to ${criteria.hoa_max:.0f}/mo"
         table.add_row("HOA max", label)
@@ -184,7 +193,7 @@ def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
     # ------------------------------------------------------------------
     listing_answer = questionary.select(
         "Listing type:",
-        choices=["For Sale", "For Rent", "Recently Sold"],
+        choices=["For Sale", "For Rent", "Recently Sold", "Coming Soon"],
         style=HOUSE_STYLE,
     ).ask()
     if listing_answer is None:
@@ -193,6 +202,7 @@ def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
         "For Sale": ListingType.SALE,
         "For Rent": ListingType.RENT,
         "Recently Sold": ListingType.SOLD,
+        "Coming Soon": ListingType.COMING_SOON,
     }
     listing_type = listing_type_map[listing_answer]
 
@@ -427,7 +437,62 @@ def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
         garage_spaces_min = None if spaces_answer == "Any" else int(spaces_answer[0])
 
     # ------------------------------------------------------------------
-    # 15. HOA
+    # 15. Fireplace
+    # ------------------------------------------------------------------
+    fireplace_answer = questionary.select(
+        "Fireplace:",
+        choices=["Don't care", "Must have", "No fireplace"],
+        style=HOUSE_STYLE,
+        instruction="(Enter to skip)",
+    ).ask()
+    if fireplace_answer is None:
+        return None
+    fireplace_map = {"Must have": True, "No fireplace": False, "Don't care": None}
+    has_fireplace = fireplace_map[fireplace_answer]
+
+    # ------------------------------------------------------------------
+    # 16. Air Conditioning
+    # ------------------------------------------------------------------
+    ac_answer = questionary.select(
+        "Air Conditioning:",
+        choices=["Don't care", "Must have", "No AC"],
+        style=HOUSE_STYLE,
+        instruction="(Enter to skip)",
+    ).ask()
+    if ac_answer is None:
+        return None
+    ac_map = {"Must have": True, "No AC": False, "Don't care": None}
+    has_ac = ac_map[ac_answer]
+
+    # ------------------------------------------------------------------
+    # 17. Heat Type
+    # ------------------------------------------------------------------
+    heat_answer = questionary.select(
+        "Heat type:",
+        choices=["Don't care", "Gas", "Electric", "Radiant", "Forced Air"],
+        style=HOUSE_STYLE,
+        instruction="(Enter to skip)",
+    ).ask()
+    if heat_answer is None:
+        return None
+    heat_type = None if heat_answer == "Don't care" else heat_answer.lower()
+
+    # ------------------------------------------------------------------
+    # 18. Pool
+    # ------------------------------------------------------------------
+    pool_answer = questionary.select(
+        "Pool:",
+        choices=["Don't care", "Must have", "No pool"],
+        style=HOUSE_STYLE,
+        instruction="(Enter to skip)",
+    ).ask()
+    if pool_answer is None:
+        return None
+    pool_map = {"Must have": True, "No pool": False, "Don't care": None}
+    has_pool = pool_map[pool_answer]
+
+    # ------------------------------------------------------------------
+    # 19. HOA
     # ------------------------------------------------------------------
     hoa_answer = questionary.select(
         "HOA max:",
@@ -463,6 +528,10 @@ def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
         has_garage=has_garage,
         garage_spaces_min=garage_spaces_min,
         hoa_max=hoa_max,
+        has_fireplace=has_fireplace,
+        has_ac=has_ac,
+        heat_type=heat_type,
+        has_pool=has_pool,
     )
 
     # ------------------------------------------------------------------

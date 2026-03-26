@@ -12,6 +12,7 @@ _LISTING_TYPE_MAP = {
     ListingType.SALE: "for_sale",
     ListingType.RENT: "for_rent",
     ListingType.SOLD: "sold",
+    ListingType.COMING_SOON: "coming_soon",
 }
 
 
@@ -128,6 +129,24 @@ class HomeHarvestProvider(BaseProvider):
             if "basement" in desc:
                 has_basement = True
 
+            # Fireplace / AC / heat type / pool detection from description
+            has_fireplace = True if "fireplace" in desc else None
+            has_ac = None
+            if "central air" in desc or "central a/c" in desc or "central ac" in desc:
+                has_ac = True
+            elif "window unit" in desc or "no a/c" in desc or "no ac" in desc or "no air" in desc:
+                has_ac = False
+            heat_type = None
+            if "gas heat" in desc or "natural gas" in desc or "gas furnace" in desc:
+                heat_type = "gas"
+            elif "electric heat" in desc or "electric furnace" in desc or "heat pump" in desc:
+                heat_type = "electric"
+            elif "radiant" in desc:
+                heat_type = "radiant"
+            elif "forced air" in desc:
+                heat_type = "forced air"
+            has_pool = True if ("pool" in desc and "pool table" not in desc and "carpool" not in desc) else None
+
             # Property type mapping
             ptype = str(row.get("style", "") or row.get("property_type", "") or "").lower()
             property_type = "single_family"
@@ -166,6 +185,10 @@ class HomeHarvestProvider(BaseProvider):
                 has_garage=has_garage,
                 garage_spaces=garage_spaces,
                 has_basement=has_basement,
+                has_fireplace=has_fireplace,
+                has_ac=has_ac,
+                heat_type=heat_type,
+                has_pool=has_pool,
                 year_built=year_built,
                 hoa_monthly=hoa,
                 latitude=lat,

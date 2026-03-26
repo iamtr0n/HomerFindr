@@ -82,6 +82,18 @@ def get_connection() -> sqlite3.Connection:
 def init_db():
     conn = get_connection()
     conn.executescript(SCHEMA)
+    # Add new filter columns (safe — ALTER TABLE ADD COLUMN is idempotent when wrapped in try/except)
+    for col, col_type in [
+        ("has_fireplace", "INTEGER"),
+        ("has_ac", "INTEGER"),
+        ("heat_type", "TEXT"),
+        ("has_pool", "INTEGER"),
+    ]:
+        try:
+            conn.execute(f"ALTER TABLE listings ADD COLUMN {col} {col_type}")
+            conn.commit()
+        except Exception:
+            pass  # Column already exists
     conn.close()
 
 
@@ -247,9 +259,10 @@ def upsert_listing(listing: Listing) -> int:
             """INSERT INTO listings (
                 source, source_id, address, city, state, zip_code, price,
                 listing_type, property_type, bedrooms, bathrooms, sqft, lot_sqft,
-                stories, has_garage, garage_spaces, has_basement, year_built,
+                stories, has_garage, garage_spaces, has_basement, has_fireplace,
+                has_ac, heat_type, has_pool, year_built,
                 hoa_monthly, latitude, longitude, photo_url, source_url
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 listing.source, listing.source_id, listing.address, listing.city,
                 listing.state, listing.zip_code, listing.price, listing.listing_type,
@@ -258,6 +271,10 @@ def upsert_listing(listing: Listing) -> int:
                 int(listing.has_garage) if listing.has_garage is not None else None,
                 listing.garage_spaces,
                 int(listing.has_basement) if listing.has_basement is not None else None,
+                int(listing.has_fireplace) if listing.has_fireplace is not None else None,
+                int(listing.has_ac) if listing.has_ac is not None else None,
+                listing.heat_type,
+                int(listing.has_pool) if listing.has_pool is not None else None,
                 listing.year_built, listing.hoa_monthly, listing.latitude,
                 listing.longitude, listing.photo_url, listing.source_url,
             ),
@@ -340,6 +357,10 @@ def _row_to_listing(row) -> Listing:
         has_garage=bool(row["has_garage"]) if row["has_garage"] is not None else None,
         garage_spaces=row["garage_spaces"],
         has_basement=bool(row["has_basement"]) if row["has_basement"] is not None else None,
+        has_fireplace=bool(row["has_fireplace"]) if row["has_fireplace"] is not None else None,
+        has_ac=bool(row["has_ac"]) if row["has_ac"] is not None else None,
+        heat_type=row["heat_type"],
+        has_pool=bool(row["has_pool"]) if row["has_pool"] is not None else None,
         year_built=row["year_built"],
         hoa_monthly=row["hoa_monthly"],
         latitude=row["latitude"],

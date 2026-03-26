@@ -57,15 +57,57 @@ def discover_zip_codes(location: str, radius_miles: int = 25) -> list[ZipInfo]:
     return zip_infos
 
 
+# Full state name -> abbreviation mapping (all 50 states + DC)
+_STATE_ABBREVS = {
+    "alabama": "AL", "alaska": "AK", "arizona": "AZ", "arkansas": "AR",
+    "california": "CA", "colorado": "CO", "connecticut": "CT", "delaware": "DE",
+    "district of columbia": "DC", "florida": "FL", "georgia": "GA", "hawaii": "HI",
+    "idaho": "ID", "illinois": "IL", "indiana": "IN", "iowa": "IA",
+    "kansas": "KS", "kentucky": "KY", "louisiana": "LA", "maine": "ME",
+    "maryland": "MD", "massachusetts": "MA", "michigan": "MI", "minnesota": "MN",
+    "mississippi": "MS", "missouri": "MO", "montana": "MT", "nebraska": "NE",
+    "nevada": "NV", "new hampshire": "NH", "new jersey": "NJ", "new mexico": "NM",
+    "new york": "NY", "north carolina": "NC", "north dakota": "ND", "ohio": "OH",
+    "oklahoma": "OK", "oregon": "OR", "pennsylvania": "PA", "rhode island": "RI",
+    "south carolina": "SC", "south dakota": "SD", "tennessee": "TN", "texas": "TX",
+    "utah": "UT", "vermont": "VT", "virginia": "VA", "washington": "WA",
+    "west virginia": "WV", "wisconsin": "WI", "wyoming": "WY",
+}
+_ABBREV_SET = set(_STATE_ABBREVS.values())  # {"AL", "AK", ...}
+
+
 def _parse_city(location: str) -> str:
-    """Extract city from 'City, State' format."""
-    parts = location.split(",")
-    return parts[0].strip()
+    """Extract city from 'City, State' or 'City State' format."""
+    if "," in location:
+        return location.split(",")[0].strip()
+    tokens = location.strip().split()
+    if len(tokens) >= 2:
+        last = tokens[-1]
+        # Check if last token is a 2-letter abbreviation
+        if last.upper() in _ABBREV_SET:
+            return " ".join(tokens[:-1])
+        # Check if last token(s) form a full state name
+        for n in (2, 1):  # Try 2-word states first ("New York"), then 1-word
+            if len(tokens) > n:
+                candidate = " ".join(tokens[-n:]).lower()
+                if candidate in _STATE_ABBREVS:
+                    return " ".join(tokens[:-n])
+    return location.strip()
 
 
 def _parse_state(location: str) -> str:
-    """Extract state from 'City, State' format."""
-    parts = location.split(",")
-    if len(parts) >= 2:
-        return parts[1].strip()
+    """Extract state from 'City, State' or 'City State' format."""
+    if "," in location:
+        parts = location.split(",")
+        return parts[1].strip() if len(parts) >= 2 else ""
+    tokens = location.strip().split()
+    if len(tokens) >= 2:
+        last = tokens[-1]
+        if last.upper() in _ABBREV_SET:
+            return last.upper()
+        for n in (2, 1):
+            if len(tokens) > n:
+                candidate = " ".join(tokens[-n:]).lower()
+                if candidate in _STATE_ABBREVS:
+                    return _STATE_ABBREVS[candidate]
     return ""

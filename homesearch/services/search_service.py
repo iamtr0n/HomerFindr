@@ -94,6 +94,7 @@ def run_search(
         previous_ids = db.get_previous_listing_ids(search_id)
         for listing in filtered:
             lid = db.upsert_listing(listing)
+            listing.id = lid
             is_new = lid not in previous_ids
             db.link_search_result(search_id, lid, is_new=is_new)
         db.update_search(search_id, last_run_at=datetime.now().isoformat())
@@ -184,6 +185,23 @@ def _passes_filters(listing: Listing, criteria: SearchCriteria) -> bool:
         return False
 
     if criteria.hoa_max is not None and listing.hoa_monthly and listing.hoa_monthly > criteria.hoa_max:
+        return False
+
+    if criteria.has_fireplace is True and listing.has_fireplace is not True:
+        return False
+
+    if criteria.has_ac is True and listing.has_ac is not True:
+        return False
+    if criteria.has_ac is False and listing.has_ac is True:
+        return False
+
+    if criteria.heat_type and criteria.heat_type != "any":
+        if listing.heat_type and listing.heat_type != criteria.heat_type:
+            return False
+
+    if criteria.has_pool is True and listing.has_pool is not True:
+        return False
+    if criteria.has_pool is False and listing.has_pool is True:
         return False
 
     if criteria.property_types:

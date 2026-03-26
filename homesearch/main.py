@@ -187,6 +187,8 @@ def search_interactive():
 @app.command()
 def serve():
     """Launch the web UI + API server."""
+    import threading
+    import time
     import uvicorn
     from homesearch.config import settings
     from homesearch.services.scheduler_service import start_scheduler
@@ -194,17 +196,30 @@ def serve():
     db.init_db()
     start_scheduler()
 
+    url = f"http://{settings.host}:{settings.port}"
     console.print(Panel.fit(
-        f"[bold green]HomeSearch Web UI[/bold green]\n"
-        f"Open [link=http://{settings.host}:{settings.port}]http://{settings.host}:{settings.port}[/link] in your browser",
+        f"[bold green]🏠 HomerFindr[/bold green]\n"
+        f"[dim]Web dashboard:[/dim] [bold cyan]{url}[/bold cyan]\n"
+        f"[dim]Press Ctrl+C to stop[/dim]",
         border_style="green",
     ))
+
+    open_browser = Confirm.ask("Open in browser?", default=True)
+
+    if open_browser:
+        def _open():
+            time.sleep(1.5)
+            import subprocess, platform
+            if platform.system() == "Darwin":
+                subprocess.run(["open", url], capture_output=True)
+        threading.Thread(target=_open, daemon=True).start()
 
     uvicorn.run(
         "homesearch.api.routes:app",
         host=settings.host,
         port=settings.port,
         reload=False,
+        log_level="error",
     )
 
 

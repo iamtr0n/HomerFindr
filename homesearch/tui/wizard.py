@@ -243,43 +243,68 @@ def run_search_wizard() -> SearchCriteria | None:
 
 
 def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
-    """Execute the wizard fields once. Returns (criteria, action) or None on cancel."""
+    """Execute the wizard as a step machine with back-navigation on every step."""
     from homesearch.tui.zip_browser import show_zip_browser
 
+    _BACK = "__BACK__"
+
     # ------------------------------------------------------------------
-    # 1. Listing Type (multi-select)
+    # Navigation helpers
     # ------------------------------------------------------------------
-    listing_type_map = {
+
+    def _s(question: str, choices: list, **kw) -> str | None:
+        """select with '← Back' appended at the bottom."""
+        return questionary.select(
+            question,
+            choices=list(choices) + [questionary.Choice("← Back", value=_BACK)],
+            style=HOUSE_STYLE,
+            **kw,
+        ).ask()
+
+    def _c(question: str, choices: list, **kw) -> list | str | None:
+        """checkbox followed by a Continue / ← Back nav prompt."""
+        answers = questionary.checkbox(
+            question,
+            choices=list(choices),
+            style=HOUSE_STYLE,
+            instruction="(Space to select, Enter to confirm)",
+            **kw,
+        ).ask()
+        if answers is None:
+            return None
+        nav = questionary.select(
+            "",
+            choices=[
+                questionary.Choice("✓  Continue", value="ok"),
+                questionary.Choice("← Back", value=_BACK),
+            ],
+            style=HOUSE_STYLE,
+        ).ask()
+        if nav is None or nav == _BACK:
+            return _BACK
+        return answers
+
+    # ------------------------------------------------------------------
+    # Step definitions — each returns dict | _BACK | None(cancel)
+    # ------------------------------------------------------------------
+
+    _lt_map = {
         "For Sale": ListingType.SALE,
         "For Rent": ListingType.RENT,
         "Recently Sold": ListingType.SOLD,
         "Coming Soon": ListingType.COMING_SOON,
     }
-    listing_answers = questionary.checkbox(
-        "Listing type(s):",
-        choices=list(listing_type_map.keys()),
-        style=HOUSE_STYLE,
-        instruction="(Space to select, Enter to confirm)",
-    ).ask()
-    if listing_answers is None:
-        return None
-    if not listing_answers:
-        listing_answers = ["For Sale"]  # default if nothing selected
-    listing_types = [listing_type_map[a] for a in listing_answers]
-    listing_type = listing_types[0]  # kept for backwards compat
 
-    # ------------------------------------------------------------------
-    # 2. Property Type
-    # ------------------------------------------------------------------
-    prop_answer = questionary.select(
-        "Property type:",
-        choices=["Any", "Single Family", "Condo", "Townhouse", "Multi-Family", "Commercial", "Land"],
-        style=HOUSE_STYLE,
-        instruction="(Enter to skip)",
-    ).ask()
-    if prop_answer is None:
-        return None
-    prop_map = {
+    def _step_listing_type(s):
+        r = _c("Listing type(s):", list(_lt_map.keys()))
+        if r is None or r == _BACK:
+            return r
+        if not r:
+            r = ["For Sale"]
+        lt_list = [_lt_map[a] for a in r]
+        return {"listing_types": lt_list, "listing_type": lt_list[0]}
+
+    _prop_map = {
         "Single Family": PropertyType.SINGLE_FAMILY,
         "Condo": PropertyType.CONDO,
         "Townhouse": PropertyType.TOWNHOUSE,
@@ -287,389 +312,289 @@ def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
         "Commercial": PropertyType.COMMERCIAL,
         "Land": PropertyType.LAND,
     }
-    property_types = [] if prop_answer == "Any" else [prop_map[prop_answer]]
+    _style_key_map = {
+        "Cape Cod": "cape_cod", "Ranch": "ranch", "Colonial": "colonial",
+        "Split Level": "split_level", "Raised Ranch": "raised_ranch",
+        "Contemporary": "contemporary", "Victorian": "victorian",
+        "Craftsman": "craftsman", "Bi-Level": "bi_level", "Tudor": "tudor",
+        "Mediterranean": "mediterranean", "Farmhouse": "farmhouse",
+    }
+    _STYLE_CHOICES = [
+        questionary.Choice("Cape Cod      · steep roof, dormers, symmetrical facade", value="Cape Cod"),
+        questionary.Choice("Ranch         · single-story, open floor plan, low pitch", value="Ranch"),
+        questionary.Choice("Colonial      · 2-story, symmetrical, shuttered windows", value="Colonial"),
+        questionary.Choice("Split Level   · staggered floors, garage on lower level", value="Split Level"),
+        questionary.Choice("Raised Ranch  · ranch elevated above a partial basement", value="Raised Ranch"),
+        questionary.Choice("Contemporary  · clean lines, large windows, open plan", value="Contemporary"),
+        questionary.Choice("Victorian     · ornate trim, turrets, wrap-around porch", value="Victorian"),
+        questionary.Choice("Craftsman     · wide porch, tapered columns, natural wood", value="Craftsman"),
+        questionary.Choice("Bi-Level      · two floors entered from a mid-level foyer", value="Bi-Level"),
+        questionary.Choice("Tudor         · steep roof, half-timbering, arched doors", value="Tudor"),
+        questionary.Choice("Mediterranean · stucco exterior, red tile roof, arched windows", value="Mediterranean"),
+        questionary.Choice("Farmhouse     · large porch, board & batten, metal roof", value="Farmhouse"),
+    ]
 
-    # ------------------------------------------------------------------
-    # 2b. House Style (only shown for single-family or "any")
-    # ------------------------------------------------------------------
-    house_styles: list[str] = []
-    if prop_answer in ("Any", "Single Family"):
-        STYLE_CHOICES = [
-            "Cape Cod", "Ranch", "Colonial", "Split Level", "Raised Ranch",
-            "Contemporary", "Victorian", "Craftsman", "Bi-Level", "Tudor",
-            "Mediterranean", "Farmhouse",
-        ]
-        style_answers = questionary.checkbox(
-            "House style(s):",
-            choices=STYLE_CHOICES,
-            style=HOUSE_STYLE,
-            instruction="(Space to select, Enter to skip/confirm)",
-        ).ask()
-        if style_answers is None:
-            return None
-        # Map labels to raw style substrings used in homeharvest data
-        _style_key_map = {
-            "Cape Cod": "cape_cod",
-            "Ranch": "ranch",
-            "Colonial": "colonial",
-            "Split Level": "split_level",
-            "Raised Ranch": "raised_ranch",
-            "Contemporary": "contemporary",
-            "Victorian": "victorian",
-            "Craftsman": "craftsman",
-            "Bi-Level": "bi_level",
-            "Tudor": "tudor",
-            "Mediterranean": "mediterranean",
-            "Farmhouse": "farmhouse",
-        }
-        house_styles = [_style_key_map[s] for s in style_answers if s in _style_key_map]
+    def _step_property_type(s):
+        r = _s("Property type:", ["Any", "Single Family", "Condo", "Townhouse", "Multi-Family", "Commercial", "Land"])
+        if r is None or r == _BACK:
+            return r
+        pt = [] if r == "Any" else [_prop_map[r]]
 
-    # ------------------------------------------------------------------
-    # 3. Radius (moved before location so it applies to all ZIP browser calls)
-    # ------------------------------------------------------------------
-    radius_answer = questionary.select(
-        "Search radius:",
-        choices=["5 miles", "10 miles", "25 miles", "50 miles", "100 miles"],
-        default="25 miles",
-        style=HOUSE_STYLE,
-        instruction="(Enter to skip)",
-    ).ask()
-    if radius_answer is None:
-        return None
-    radius_miles = int(radius_answer.split()[0])
+        house_styles: list[str] = []
+        if r in ("Any", "Single Family"):
+            sr = _c("House style(s):", _STYLE_CHOICES)
+            if sr is None or sr == _BACK:
+                return sr
+            house_styles = [_style_key_map[v] for v in sr if v in _style_key_map]
 
-    # ------------------------------------------------------------------
-    # 4. Search Mode + Location + ZIP Discovery
-    # ------------------------------------------------------------------
-    search_mode = questionary.select(
-        "Search mode:",
-        choices=["Single area", "Multiple areas (combine ZIP codes)"],
-        style=HOUSE_STYLE,
-    ).ask()
-    if search_mode is None:
-        return None
+        return {"prop_answer": r, "property_types": pt, "house_styles": house_styles}
 
-    zip_codes: list[str] = []
-    excluded_zips: list[str] = []
-    location: str = ""
+    def _step_radius(s):
+        r = _s("Search radius:", ["5 miles", "10 miles", "25 miles", "50 miles", "100 miles"])
+        if r is None or r == _BACK:
+            return r
+        return {"radius_miles": int(r.split()[0])}
 
-    if search_mode == "Single area":
-        # --- Single area ---
-        location_answer = questionary.text(
-            "City, State or ZIP code:",
-            style=HOUSE_STYLE,
-        ).ask()
-        if location_answer is None:
-            return None
-        location = location_answer.strip()
-        if not location:
-            console.print("[red]Location is required.[/red]")
-            return None
+    def _step_search_mode(s):
+        r = _s("Search mode:", ["Single area", "Multiple areas (combine ZIP codes)"])
+        if r is None or r == _BACK:
+            return r
+        return {"search_mode": r}
 
-        selected = show_zip_browser(location, radius_miles)
-        if selected is None:
-            return None
-        zip_codes = selected
-    else:
-        # --- Multiple areas ---
+    def _step_location(s):
+        radius_miles = s.get("radius_miles", 25)
+        mode = s.get("search_mode", "Single area")
+
+        if mode == "Single area":
+            loc_answer = questionary.text("City, State or ZIP code:", style=HOUSE_STYLE).ask()
+            if loc_answer is None:
+                return _BACK
+            location = loc_answer.strip()
+            if not location:
+                console.print("[red]Location is required.[/red]")
+                return _BACK
+            selected = show_zip_browser(location, radius_miles)
+            if selected is None:
+                return _BACK
+            return {"location": location, "zip_codes": selected, "excluded_zips": []}
+
+        # Multiple areas
         all_locations: list[str] = []
         all_zips: list[str] = []
-
         while True:
-            location_answer = questionary.text(
-                "City, State or ZIP code:",
-                style=HOUSE_STYLE,
-            ).ask()
-            if location_answer is None:
-                return None
-            loc = location_answer.strip()
+            loc_answer = questionary.text("City, State or ZIP code:", style=HOUSE_STYLE).ask()
+            if loc_answer is None:
+                return _BACK
+            loc = loc_answer.strip()
             if not loc:
                 console.print("[red]Location is required.[/red]")
                 continue
             all_locations.append(loc)
-
             selected = show_zip_browser(loc, radius_miles)
             if selected is None:
-                return None
+                return _BACK
             all_zips.extend(selected)
-
-            add_more = questionary.confirm(
-                "Add another location?",
-                default=False,
-                style=HOUSE_STYLE,
-            ).ask()
-            if add_more is None:
-                return None
+            add_more = questionary.confirm("Add another location?", default=False, style=HOUSE_STYLE).ask()
             if not add_more:
                 break
-
-        # Deduplicate while preserving order
         zip_codes = list(dict.fromkeys(all_zips))
         location = all_locations[0] if all_locations else ""
         console.print(
             f"[green]Selected {len(zip_codes)} ZIP codes across "
             f"{len(all_locations)} area(s): {', '.join(all_locations)}[/green]"
         )
+        return {"location": location, "zip_codes": zip_codes, "excluded_zips": []}
 
-    if not zip_codes and not location:
-        console.print("[yellow]No ZIP codes found — searching by location name.[/yellow]")
+    def _step_price(s):
+        r = _c("Price range(s):", list(_PRICE_MAP.keys()) + ["Custom range"])
+        if r is None or r == _BACK:
+            return r
+        price_min, price_max = _parse_multi_price(r)
+        if "Custom range" in r:
+            from rich.prompt import Prompt
+            cmin = Prompt.ask("  Min price (Enter to skip)", default="")
+            cmax = Prompt.ask("  Max price (Enter to skip)", default="")
+            try:
+                price_min = int(cmin.strip().replace(",", "").replace("$", "")) if cmin.strip() else None
+            except ValueError:
+                price_min = None
+            try:
+                price_max = int(cmax.strip().replace(",", "").replace("$", "")) if cmax.strip() else None
+            except ValueError:
+                price_max = None
+        return {"price_min": price_min, "price_max": price_max}
 
-    # ------------------------------------------------------------------
-    # 6. Price Range (multi-select)
-    # ------------------------------------------------------------------
-    PRICE_RANGES = list(_PRICE_MAP.keys()) + ["Custom range"]
-    price_answers = questionary.checkbox(
-        "Price range(s):",
-        choices=PRICE_RANGES,
-        style=HOUSE_STYLE,
-        instruction="(Space to select, Enter to confirm)",
-    ).ask()
-    if price_answers is None:
-        return None
-    price_min, price_max = _parse_multi_price(price_answers)
-    if "Custom range" in price_answers:
-        from rich.prompt import Prompt
-        custom_min_str = Prompt.ask("  Min price (Enter to skip)", default="")
-        custom_max_str = Prompt.ask("  Max price (Enter to skip)", default="")
-        try:
-            price_min = int(custom_min_str.strip().replace(",", "").replace("$", "")) if custom_min_str.strip() else None
-        except ValueError:
-            price_min = None
-        try:
-            price_max = int(custom_max_str.strip().replace(",", "").replace("$", "")) if custom_max_str.strip() else None
-        except ValueError:
-            price_max = None
+    def _step_beds(s):
+        r = _s("Bedrooms:", ["Any", "1+", "2+", "3+", "4+", "5+"])
+        if r is None or r == _BACK:
+            return r
+        return {"bedrooms_min": None if r == "Any" else int(r[0])}
 
-    # ------------------------------------------------------------------
-    # 7. Bedrooms
-    # ------------------------------------------------------------------
-    beds_answer = questionary.select(
-        "Bedrooms:",
-        choices=["Any", "1+", "2+", "3+", "4+", "5+"],
-        style=HOUSE_STYLE,
-        instruction="(Enter to skip)",
-    ).ask()
-    if beds_answer is None:
-        return None
-    bedrooms_min = None if beds_answer == "Any" else int(beds_answer[0])
+    def _step_baths(s):
+        r = _s("Bathrooms:", ["Any", "1+", "1.5+", "2+", "2.5+", "3+"])
+        if r is None or r == _BACK:
+            return r
+        return {"bathrooms_min": None if r == "Any" else float(r.rstrip("+"))}
 
-    # ------------------------------------------------------------------
-    # 8. Bathrooms
-    # ------------------------------------------------------------------
-    baths_answer = questionary.select(
-        "Bathrooms:",
-        choices=["Any", "1+", "1.5+", "2+", "2.5+", "3+"],
-        style=HOUSE_STYLE,
-        instruction="(Enter to skip)",
-    ).ask()
-    if baths_answer is None:
-        return None
-    bathrooms_min = None if baths_answer == "Any" else float(baths_answer.rstrip("+"))
+    def _step_sqft(s):
+        r = _c("Square footage:", list(_SQFT_MAP.keys()))
+        if r is None or r == _BACK:
+            return r
+        sqft_min, sqft_max = _parse_multi_sqft(r)
+        return {"sqft_min": sqft_min, "sqft_max": sqft_max}
 
-    # ------------------------------------------------------------------
-    # 9. Square Footage (multi-select)
-    # ------------------------------------------------------------------
-    sqft_answers = questionary.checkbox(
-        "Square footage:",
-        choices=list(_SQFT_MAP.keys()),
-        style=HOUSE_STYLE,
-        instruction="(Space to select, Enter to skip/confirm)",
-    ).ask()
-    if sqft_answers is None:
-        return None
-    sqft_min, sqft_max = _parse_multi_sqft(sqft_answers)
+    def _step_lot(s):
+        r = _c("Lot size:", list(_LOT_MAP.keys()))
+        if r is None or r == _BACK:
+            return r
+        lot_min, lot_max = _parse_multi_lot(r)
+        return {"lot_sqft_min": lot_min, "lot_sqft_max": lot_max}
 
-    # ------------------------------------------------------------------
-    # 10. Lot Size (multi-select)
-    # ------------------------------------------------------------------
-    lot_answers = questionary.checkbox(
-        "Lot size:",
-        choices=list(_LOT_MAP.keys()),
-        style=HOUSE_STYLE,
-        instruction="(Space to select, Enter to skip/confirm)",
-    ).ask()
-    if lot_answers is None:
-        return None
-    lot_sqft_min, lot_sqft_max = _parse_multi_lot(lot_answers)
+    def _step_year(s):
+        r = _s("Year built:", ["Any", "2020+", "2010+", "2000+", "1990+", "1980+", "1970 or older"])
+        if r is None or r == _BACK:
+            return r
+        return {"year_built_min": _parse_year(r)}
 
-    # ------------------------------------------------------------------
-    # 11. Year Built
-    # ------------------------------------------------------------------
-    year_answer = questionary.select(
-        "Year built:",
-        choices=["Any", "2020+", "2010+", "2000+", "1990+", "1980+", "1970 or older"],
-        style=HOUSE_STYLE,
-        instruction="(Enter to skip)",
-    ).ask()
-    if year_answer is None:
-        return None
-    year_built_min = _parse_year(year_answer)
+    def _step_stories(s):
+        r = _s("Stories:", ["Any", "1+", "2+", "3+"])
+        if r is None or r == _BACK:
+            return r
+        return {"stories_min": None if r == "Any" else int(r[0])}
 
-    # ------------------------------------------------------------------
-    # 12. Stories / Floors
-    # ------------------------------------------------------------------
-    stories_answer = questionary.select(
-        "Stories:",
-        choices=["Any", "1+", "2+", "3+"],
-        style=HOUSE_STYLE,
-        instruction="(Enter to skip)",
-    ).ask()
-    if stories_answer is None:
-        return None
-    stories_min = None if stories_answer == "Any" else int(stories_answer[0])
+    def _step_basement(s):
+        r = _s("Basement:", ["Don't care", "Must have", "No basement"])
+        if r is None or r == _BACK:
+            return r
+        return {"has_basement": {"Must have": True, "No basement": False, "Don't care": None}[r]}
 
-    # ------------------------------------------------------------------
-    # 13. Basement
-    # ------------------------------------------------------------------
-    basement_answer = questionary.select(
-        "Basement:",
-        choices=["Don't care", "Must have", "No basement"],
-        style=HOUSE_STYLE,
-        instruction="(Enter to skip)",
-    ).ask()
-    if basement_answer is None:
-        return None
-    basement_map = {"Must have": True, "No basement": False, "Don't care": None}
-    has_basement = basement_map[basement_answer]
+    def _step_garage(s):
+        r = _s("Garage:", ["Don't care", "Must have", "No garage"])
+        if r is None or r == _BACK:
+            return r
+        has_garage = {"Must have": True, "No garage": False, "Don't care": None}[r]
+        garage_spaces_min = None
+        if has_garage is True:
+            sr = _s("Minimum garage spaces:", ["Any", "1+", "2+", "3+"])
+            if sr is None or sr == _BACK:
+                return sr
+            garage_spaces_min = None if sr == "Any" else int(sr[0])
+        return {"has_garage": has_garage, "garage_spaces_min": garage_spaces_min}
 
-    # ------------------------------------------------------------------
-    # 14. Garage
-    # ------------------------------------------------------------------
-    garage_answer = questionary.select(
-        "Garage:",
-        choices=["Don't care", "Must have", "No garage"],
-        style=HOUSE_STYLE,
-        instruction="(Enter to skip)",
-    ).ask()
-    if garage_answer is None:
-        return None
-    garage_map = {"Must have": True, "No garage": False, "Don't care": None}
-    has_garage = garage_map[garage_answer]
+    def _step_fireplace(s):
+        r = _s("Fireplace:", ["Don't care", "Must have", "No fireplace"])
+        if r is None or r == _BACK:
+            return r
+        return {"has_fireplace": {"Must have": True, "No fireplace": False, "Don't care": None}[r]}
 
-    garage_spaces_min: Optional[int] = None
-    if has_garage is True:
-        spaces_answer = questionary.select(
-            "Minimum garage spaces:",
-            choices=["Any", "1+", "2+", "3+"],
-            style=HOUSE_STYLE,
-            instruction="(Enter to skip)",
-        ).ask()
-        if spaces_answer is None:
-            return None
-        garage_spaces_min = None if spaces_answer == "Any" else int(spaces_answer[0])
+    def _step_ac(s):
+        r = _s("Air Conditioning:", ["Don't care", "Must have", "No AC"])
+        if r is None or r == _BACK:
+            return r
+        return {"has_ac": {"Must have": True, "No AC": False, "Don't care": None}[r]}
+
+    def _step_heat(s):
+        r = _s("Heat type:", ["Don't care", "Gas", "Electric", "Radiant", "Forced Air"])
+        if r is None or r == _BACK:
+            return r
+        return {"heat_type": None if r == "Don't care" else r.lower()}
+
+    def _step_pool(s):
+        r = _s("Pool:", ["Don't care", "Must have", "No pool"])
+        if r is None or r == _BACK:
+            return r
+        return {"has_pool": {"Must have": True, "No pool": False, "Don't care": None}[r]}
+
+    def _step_hoa(s):
+        r = _s("HOA max:", ["Any / No limit", "No HOA ($0)", "Up to $100/mo", "Up to $200/mo", "Up to $300/mo", "Up to $500/mo"])
+        if r is None or r == _BACK:
+            return r
+        return {"hoa_max": _parse_hoa(r)}
+
+    steps = [
+        _step_listing_type,
+        _step_property_type,
+        _step_radius,
+        _step_search_mode,
+        _step_location,
+        _step_price,
+        _step_beds,
+        _step_baths,
+        _step_sqft,
+        _step_lot,
+        _step_year,
+        _step_stories,
+        _step_basement,
+        _step_garage,
+        _step_fireplace,
+        _step_ac,
+        _step_heat,
+        _step_pool,
+        _step_hoa,
+    ]
 
     # ------------------------------------------------------------------
-    # 15. Fireplace
+    # Step machine loop
     # ------------------------------------------------------------------
-    fireplace_answer = questionary.select(
-        "Fireplace:",
-        choices=["Don't care", "Must have", "No fireplace"],
-        style=HOUSE_STYLE,
-        instruction="(Enter to skip)",
-    ).ask()
-    if fireplace_answer is None:
-        return None
-    fireplace_map = {"Must have": True, "No fireplace": False, "Don't care": None}
-    has_fireplace = fireplace_map[fireplace_answer]
+    state: dict = {}
+    step_idx = 0
+
+    while step_idx < len(steps):
+        result = steps[step_idx](state)
+        if result is None:
+            return None  # ESC / hard cancel
+        if result == _BACK:
+            if step_idx == 0:
+                return None  # back on first step = cancel
+            step_idx -= 1
+        else:
+            state.update(result)
+            step_idx += 1
 
     # ------------------------------------------------------------------
-    # 16. Air Conditioning
-    # ------------------------------------------------------------------
-    ac_answer = questionary.select(
-        "Air Conditioning:",
-        choices=["Don't care", "Must have", "No AC"],
-        style=HOUSE_STYLE,
-        instruction="(Enter to skip)",
-    ).ask()
-    if ac_answer is None:
-        return None
-    ac_map = {"Must have": True, "No AC": False, "Don't care": None}
-    has_ac = ac_map[ac_answer]
-
-    # ------------------------------------------------------------------
-    # 17. Heat Type
-    # ------------------------------------------------------------------
-    heat_answer = questionary.select(
-        "Heat type:",
-        choices=["Don't care", "Gas", "Electric", "Radiant", "Forced Air"],
-        style=HOUSE_STYLE,
-        instruction="(Enter to skip)",
-    ).ask()
-    if heat_answer is None:
-        return None
-    heat_type = None if heat_answer == "Don't care" else heat_answer.lower()
-
-    # ------------------------------------------------------------------
-    # 18. Pool
-    # ------------------------------------------------------------------
-    pool_answer = questionary.select(
-        "Pool:",
-        choices=["Don't care", "Must have", "No pool"],
-        style=HOUSE_STYLE,
-        instruction="(Enter to skip)",
-    ).ask()
-    if pool_answer is None:
-        return None
-    pool_map = {"Must have": True, "No pool": False, "Don't care": None}
-    has_pool = pool_map[pool_answer]
-
-    # ------------------------------------------------------------------
-    # 19. HOA
-    # ------------------------------------------------------------------
-    hoa_answer = questionary.select(
-        "HOA max:",
-        choices=["Any / No limit", "No HOA ($0)", "Up to $100/mo", "Up to $200/mo", "Up to $300/mo", "Up to $500/mo"],
-        style=HOUSE_STYLE,
-        instruction="(Enter to skip)",
-    ).ask()
-    if hoa_answer is None:
-        return None
-    hoa_max = _parse_hoa(hoa_answer)
-
-    # ------------------------------------------------------------------
-    # Build criteria
+    # Build criteria from accumulated state
     # ------------------------------------------------------------------
     criteria = SearchCriteria(
-        location=location,
-        radius_miles=radius_miles,
-        zip_codes=zip_codes,
-        excluded_zips=excluded_zips,
-        listing_type=listing_type,
-        listing_types=listing_types,
-        property_types=property_types,
-        house_styles=house_styles,
-        price_min=price_min,
-        price_max=price_max,
-        bedrooms_min=bedrooms_min,
-        bathrooms_min=bathrooms_min,
-        sqft_min=sqft_min,
-        sqft_max=sqft_max,
-        lot_sqft_min=lot_sqft_min,
-        lot_sqft_max=lot_sqft_max,
-        year_built_min=year_built_min,
-        stories_min=stories_min,
-        has_basement=has_basement,
-        has_garage=has_garage,
-        garage_spaces_min=garage_spaces_min,
-        hoa_max=hoa_max,
-        has_fireplace=has_fireplace,
-        has_ac=has_ac,
-        heat_type=heat_type,
-        has_pool=has_pool,
+        location=state.get("location", ""),
+        radius_miles=state.get("radius_miles", 25),
+        zip_codes=state.get("zip_codes", []),
+        excluded_zips=state.get("excluded_zips", []),
+        listing_type=state.get("listing_type", ListingType.SALE),
+        listing_types=state.get("listing_types", [ListingType.SALE]),
+        property_types=state.get("property_types", []),
+        house_styles=state.get("house_styles", []),
+        price_min=state.get("price_min"),
+        price_max=state.get("price_max"),
+        bedrooms_min=state.get("bedrooms_min"),
+        bathrooms_min=state.get("bathrooms_min"),
+        sqft_min=state.get("sqft_min"),
+        sqft_max=state.get("sqft_max"),
+        lot_sqft_min=state.get("lot_sqft_min"),
+        lot_sqft_max=state.get("lot_sqft_max"),
+        year_built_min=state.get("year_built_min"),
+        stories_min=state.get("stories_min"),
+        has_basement=state.get("has_basement"),
+        has_garage=state.get("has_garage"),
+        garage_spaces_min=state.get("garage_spaces_min"),
+        hoa_max=state.get("hoa_max"),
+        has_fireplace=state.get("has_fireplace"),
+        has_ac=state.get("has_ac"),
+        heat_type=state.get("heat_type"),
+        has_pool=state.get("has_pool"),
     )
 
     # ------------------------------------------------------------------
-    # D-12: Summary panel + confirm
+    # Summary + confirm
     # ------------------------------------------------------------------
     _display_summary(criteria)
 
     confirm_answer = questionary.select(
         "Search now?",
-        choices=["Yes", "Edit", "Cancel"],
+        choices=["Yes", "Edit (restart)", "Cancel"],
         style=HOUSE_STYLE,
     ).ask()
     if confirm_answer is None or confirm_answer == "Cancel":
         return (criteria, "cancel")
-    if confirm_answer == "Edit":
+    if confirm_answer == "Edit (restart)":
         return (criteria, "edit")
     return (criteria, "yes")

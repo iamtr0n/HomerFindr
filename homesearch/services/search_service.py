@@ -262,6 +262,15 @@ def _perfect_score(criteria: SearchCriteria) -> int:
 def _passes_filters(listing: Listing, criteria: SearchCriteria) -> bool:
     """Client-side filtering for fields providers might not support natively."""
 
+    # Enforce listing_type — safety net so pending/coming_soon never bleed into for-sale results
+    allowed_types: list[str] = []
+    if criteria.listing_types:
+        allowed_types = [lt.value for lt in criteria.listing_types]
+    elif criteria.listing_type:
+        allowed_types = [criteria.listing_type.value]
+    if allowed_types and listing.listing_type not in allowed_types:
+        return False
+
     if criteria.price_min and listing.price and listing.price < criteria.price_min:
         return False
     if criteria.price_max and listing.price and listing.price > criteria.price_max:

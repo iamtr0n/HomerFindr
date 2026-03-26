@@ -32,62 +32,85 @@ def _parse_price_range(choice: str) -> tuple[Optional[int], Optional[int]]:
     return mapping.get(choice, (None, None))
 
 
+_PRICE_MAP = {
+    "Under $200k":      (None, 200_000),
+    "$200k - $350k":    (200_000, 350_000),
+    "$350k - $500k":    (350_000, 500_000),
+    "$500k - $750k":    (500_000, 750_000),
+    "$750k - $1M":      (750_000, 1_000_000),
+    "$1M - $1.25M":     (1_000_000, 1_250_000),
+    "$1.25M - $1.5M":   (1_250_000, 1_500_000),
+    "Over $1.5M":       (1_500_000, None),
+}
+
+
 def _parse_multi_price(selections: list[str]) -> tuple[Optional[int], Optional[int]]:
     """Combine multiple price range selections into a single (price_min, price_max)."""
-    range_map = {
-        "Under $200k":      (None, 200_000),
-        "$200k - $350k":    (200_000, 350_000),
-        "$350k - $500k":    (350_000, 500_000),
-        "$500k - $750k":    (500_000, 750_000),
-        "$750k - $1M":      (750_000, 1_000_000),
-        "$1M - $1.25M":     (1_000_000, 1_250_000),
-        "$1.25M - $1.5M":   (1_250_000, 1_500_000),
-        "Over $1.5M":       (1_500_000, None),
-    }
-    mins = []
-    maxes = []
+    non_custom = [s for s in selections if s != "Custom range"]
+    return _combine_ranges(non_custom, _PRICE_MAP)
+
+
+_SQFT_MAP = {
+    "Under 1,000  · studio/condo, ~4 parking spaces":          (None, 1_000),
+    "1,000 - 1,500  · starter home, ~1 Starbucks":             (1_000, 1_500),
+    "1,500 - 2,000  · avg American home, ~½ tennis court":     (1_500, 2_000),
+    "2,000 - 3,000  · spacious family home, ~1 tennis court":  (2_000, 3_000),
+    "3,000 - 4,000  · large home, ~½ basketball court":        (3_000, 4_000),
+    "Over 4,000  · estate, bigger than a basketball court":    (4_000, None),
+}
+
+_LOT_MAP = {
+    "Under 5,000 sqft  · city lot, ~1 tennis court":           (None, 5_000),
+    "5,000 - 10,000 sqft  · suburban lot, ~2 tennis courts":   (5_000, 10_000),
+    "10,000 - 20,000 sqft  · ¼ acre, ~3 school buses long":    (10_000, 20_000),
+    "Over 20,000 sqft  · ½ acre+, ~½ football field":          (20_000, 43_560),
+    "Over 1 acre  · full acre+, bigger than a football field":  (43_560, None),
+}
+
+
+def _combine_ranges(selections: list[str], mapping: dict) -> tuple[Optional[int], Optional[int]]:
+    """Merge multiple range selections: take the lowest min and highest max."""
+    has_open_low = False
+    has_open_high = False
+    mins, maxes = [], []
     for sel in selections:
-        if sel == "Custom range":
+        bounds = mapping.get(sel)
+        if not bounds:
             continue
-        bounds = range_map.get(sel)
-        if bounds:
-            lo, hi = bounds
-            if lo is not None:
-                mins.append(lo)
-            if hi is not None:
-                maxes.append(hi)
-    price_min = min(mins) if mins else None
-    price_max = max(maxes) if maxes else None
-    return price_min, price_max
+        lo, hi = bounds
+        if lo is None:
+            has_open_low = True
+        else:
+            mins.append(lo)
+        if hi is None:
+            has_open_high = True
+        else:
+            maxes.append(hi)
+    final_min = None if has_open_low else (min(mins) if mins else None)
+    final_max = None if has_open_high else (max(maxes) if maxes else None)
+    return (final_min, final_max)
+
+
+def _parse_multi_sqft(selections: list[str]) -> tuple[Optional[int], Optional[int]]:
+    return _combine_ranges(selections, _SQFT_MAP)
+
+
+def _parse_multi_lot(selections: list[str]) -> tuple[Optional[int], Optional[int]]:
+    return _combine_ranges(selections, _LOT_MAP)
 
 
 def _parse_sqft_range(choice: str) -> tuple[Optional[int], Optional[int]]:
-    """Map square footage label to (sqft_min, sqft_max)."""
-    if choice == "Any":
+    """Legacy single-choice wrapper — used by non-wizard callers."""
+    if choice in ("Any", ""):
         return (None, None)
-    mapping = {
-        "Under 1,000":     (None, 1_000),
-        "1,000 - 1,500":   (1_000, 1_500),
-        "1,500 - 2,000":   (1_500, 2_000),
-        "2,000 - 3,000":   (2_000, 3_000),
-        "3,000 - 4,000":   (3_000, 4_000),
-        "Over 4,000":      (4_000, None),
-    }
-    return mapping.get(choice, (None, None))
+    return _parse_multi_sqft([choice])
 
 
 def _parse_lot_range(choice: str) -> tuple[Optional[int], Optional[int]]:
-    """Map lot size label to (lot_sqft_min, lot_sqft_max)."""
-    if choice == "Any":
+    """Legacy single-choice wrapper — used by non-wizard callers."""
+    if choice in ("Any", ""):
         return (None, None)
-    mapping = {
-        "Under 5,000 sqft":       (None, 5_000),
-        "5,000 - 10,000 sqft":    (5_000, 10_000),
-        "10,000 - 20,000 sqft":   (10_000, 20_000),
-        "Over 20,000 sqft":       (20_000, None),
-        "Over 1 acre":            (43_560, None),
-    }
-    return mapping.get(choice, (None, None))
+    return _parse_multi_lot([choice])
 
 
 def _parse_year(choice: str) -> Optional[int]:
@@ -394,17 +417,7 @@ def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
     # ------------------------------------------------------------------
     # 6. Price Range (multi-select)
     # ------------------------------------------------------------------
-    PRICE_RANGES = [
-        "Under $200k",
-        "$200k - $350k",
-        "$350k - $500k",
-        "$500k - $750k",
-        "$750k - $1M",
-        "$1M - $1.25M",
-        "$1.25M - $1.5M",
-        "Over $1.5M",
-        "Custom range",
-    ]
+    PRICE_RANGES = list(_PRICE_MAP.keys()) + ["Custom range"]
     price_answers = questionary.checkbox(
         "Price range(s):",
         choices=PRICE_RANGES,
@@ -454,30 +467,30 @@ def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
     bathrooms_min = None if baths_answer == "Any" else float(baths_answer.rstrip("+"))
 
     # ------------------------------------------------------------------
-    # 9. Square Footage
+    # 9. Square Footage (multi-select)
     # ------------------------------------------------------------------
-    sqft_answer = questionary.select(
+    sqft_answers = questionary.checkbox(
         "Square footage:",
-        choices=["Any", "Under 1,000", "1,000 - 1,500", "1,500 - 2,000", "2,000 - 3,000", "3,000 - 4,000", "Over 4,000"],
+        choices=list(_SQFT_MAP.keys()),
         style=HOUSE_STYLE,
-        instruction="(Enter to skip)",
+        instruction="(Space to select, Enter to skip/confirm)",
     ).ask()
-    if sqft_answer is None:
+    if sqft_answers is None:
         return None
-    sqft_min, sqft_max = _parse_sqft_range(sqft_answer)
+    sqft_min, sqft_max = _parse_multi_sqft(sqft_answers)
 
     # ------------------------------------------------------------------
-    # 10. Lot Size
+    # 10. Lot Size (multi-select)
     # ------------------------------------------------------------------
-    lot_answer = questionary.select(
+    lot_answers = questionary.checkbox(
         "Lot size:",
-        choices=["Any", "Under 5,000 sqft", "5,000 - 10,000 sqft", "10,000 - 20,000 sqft", "Over 20,000 sqft", "Over 1 acre"],
+        choices=list(_LOT_MAP.keys()),
         style=HOUSE_STYLE,
-        instruction="(Enter to skip)",
+        instruction="(Space to select, Enter to skip/confirm)",
     ).ask()
-    if lot_answer is None:
+    if lot_answers is None:
         return None
-    lot_sqft_min, lot_sqft_max = _parse_lot_range(lot_answer)
+    lot_sqft_min, lot_sqft_max = _parse_multi_lot(lot_answers)
 
     # ------------------------------------------------------------------
     # 11. Year Built

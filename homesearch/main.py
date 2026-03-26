@@ -1,5 +1,6 @@
 """CLI entrypoint for HomeSearch Aggregator."""
 
+import questionary
 import typer
 from rich.console import Console
 from rich.prompt import Prompt, Confirm, IntPrompt, FloatPrompt
@@ -33,7 +34,30 @@ def main(ctx: typer.Context):
 @app.command()
 def search():
     """Interactive search wizard - find properties with detailed filters."""
-    search_interactive()
+    from homesearch.tui.wizard import run_search_wizard
+    from homesearch.services.search_service import run_search
+
+    criteria = run_search_wizard()
+    if criteria is None:
+        return
+
+    db.init_db()
+    save_it = questionary.confirm("Save this search for daily alerts?", default=True).ask()
+    search_id = None
+    if save_it:
+        name = questionary.text("Name this search:").ask()
+        if name:
+            try:
+                search_id = db.save_search(SavedSearch(name=name.strip(), criteria=criteria))
+                console.print(f"[green]Saved as '{name}'[/green]")
+            except Exception as e:
+                console.print(f"[red]Could not save: {e}[/red]")
+
+    console.print("\n")
+    with console.status("[bold blue]🔍 Searching across all platforms...[/bold blue]"):
+        results = run_search(criteria, search_id=search_id, use_zip_discovery=False)
+
+    _display_results(results)
 
 
 def search_interactive():

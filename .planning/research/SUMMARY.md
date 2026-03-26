@@ -1,17 +1,17 @@
 # Project Research Summary
 
-**Project:** HomerFindr — UX Polish Milestone
-**Domain:** Home search aggregator — dual-interface (CLI + web dashboard)
+**Project:** HomerFindr — v1.1 Polish & Verification
+**Domain:** Local-first CLI + web dashboard real estate aggregator
 **Researched:** 2026-03-25
 **Confidence:** HIGH
 
 ## Executive Summary
 
-HomerFindr is a local-first, personal-use home search aggregator that scrapes Realtor.com and Redfin and presents results through both an interactive CLI and a React web dashboard. The UX polish milestone transforms an already-working but utilitarian tool into a polished, delightful experience: arrow-key navigation throughout the CLI, an ASCII art splash screen, a professional property card web UI, and a global desktop command. The recommended approach keeps all changes strictly at the surface layer — the existing FastAPI / service / provider architecture is correct and should not be touched. New libraries (questionary for interactive menus, art for ASCII art, shadcn/ui components for the web) layer cleanly on top of what exists.
+HomerFindr v1.1 is a targeted polish-and-verification milestone, not a feature expansion. The v1.0 codebase delivered a complete layered architecture — arrow-key TUI, FastAPI backend, React web dashboard, provider abstraction, SQLite persistence — and v1.1 adds three narrow improvements on top: property card thumbnail photos visible in the browser, richer CLI progress feedback during searches, and confirmed-working Settings/Saved Searches menu paths. All three features use capabilities already present in the installed package set; zero new dependencies are required for any of them.
 
-The single most important recommendation is to fix two known bugs before building anything new: the double `/api` prefix that returns 404 on every preview search, and the `@app.on_event("startup")` deprecation that leaks warnings into the CLI output. Building a polished UI on top of broken plumbing wastes time. After those fixes, the work naturally splits into two independent tracks — CLI interactive layer and web UI redesign — that can be developed in parallel, joined in a final phase that bridges them with the "Launch Web UI from CLI" feature and desktop packaging.
+The recommended approach is surgical. The photo display gap is not a data problem — `Listing.photo_url` is already populated by both providers — it is a browser referer header problem solvable with a one-line `referrerPolicy="no-referrer"` attribute on the `<img>` tag in `PropertyCard.jsx`. The CLI progress upgrade replaces a hand-rolled braille spinner in `tui/results.py` with `rich.progress.Progress` (already installed at >=13.7.0) using indeterminate mode (`total=None`) or per-ZIP `add_task`/`advance` once ZIP count is known. Settings and Saved Searches menu wiring is confirmed complete by direct code inspection; v1.1's job is runtime verification and edge-case patching, not new wiring.
 
-The primary risks are: (1) Rich and questionary/InquirerPy output corruption if the two are ever run concurrently rather than sequentially — this is an easy mistake with a visually obvious failure mode; (2) blocking HTTP scraping freezing the interactive spinner — requires running the search in a background thread; (3) macOS .app packaging being significantly more complex than it appears — ship the global `homerfindr` CLI command via pipx first and treat the .app as optional. All three risks have clear, validated mitigations and should not block delivery if addressed in the correct order.
+The primary risk is terminal state corruption: `Rich.Live` and `questionary` fight for cursor control if a `Live`/`Progress` context is not fully exited before any `questionary` prompt begins. The existing code respects this invariant via a documented comment in `results.py`; any progress bar refactoring must maintain it. Secondary risks are CDN-level photo blocking (mitigated by `referrerPolicy`) and unstable Redfin photo response key names (mitigated by diagnostic logging before touching any code). Both risks are well-understood and have clear, low-effort prevention strategies.
 
 ---
 
@@ -19,123 +19,107 @@ The primary risks are: (1) Rich and questionary/InquirerPy output corruption if 
 
 ### Recommended Stack
 
-The existing Python 3.11 / FastAPI / React / Vite / Tailwind stack requires only four additions for this milestone. On the Python side: **questionary 2.1.1** for arrow-key interactive menus (InquirerPy is abandoned/inactive per Snyk; simple-term-menu is Linux-primary) and **art 6.5** for the ASCII art splash screen (677+ fonts, simpler API than pyfiglet). On the frontend: **shadcn/ui** CLI-installed component primitives (not a library — components are owned code, zero runtime dependency, Tailwind-compatible). For packaging: **pipx** for global CLI installation with **Platypus** (free, v5.5.0, Dec 2025) as the macOS .app wrapper — far simpler than PyInstaller for a CLI-first tool since it just wraps the installed shell command rather than bundling the Python runtime.
+The v1.0 stack is validated and unchanged for v1.1. Zero new Python packages and zero new npm packages are needed.
 
-Note: ARCHITECTURE.md diverges slightly from STACK.md on the interactive menu library — ARCHITECTURE.md uses InquirerPy throughout while STACK.md recommends questionary. **Resolution: use questionary**, which is confirmed actively maintained. The underlying technology is the same (both use prompt_toolkit); questionary has the cleaner API for pre-built option lists.
-
-**Core technologies:**
-- **questionary 2.1.1**: Arrow-key select/checkbox/confirm prompts — actively maintained (Aug 2025), prompt_toolkit-based, no conflict with Rich
-- **art 6.5**: ASCII art splash screen — 677+ fonts, MIT, one-call API, works alongside Rich
-- **shadcn/ui (latest)**: React component primitives — copy-paste into codebase, no runtime dependency, Tailwind v3 compatible
-- **pipx**: Global CLI installation — handles Python upgrades gracefully, recommended over `pip install -e .`
-- **Platypus 5.5.0**: macOS .app wrapper — wraps installed shell command, no Python bundling needed
+**Core technologies (already installed, no changes):**
+- `rich>=13.7.0`: `rich.progress.Progress` API confirmed available from installed source at `.venv/lib/python3.11/site-packages/rich/progress.py` — `SpinnerColumn`, `TextColumn`, `TimeElapsedColumn`, `BarColumn`, `MofNCompleteColumn`, `add_task()`, `advance()`, `transient` param all present
+- `questionary>=2.1.1`: arrow-key prompts — must be called only after `Rich.Live`/`Progress` context has fully exited; this invariant is already established in the codebase
+- `homeharvest>=0.4.0`: `Description.primary_photo: HttpUrl | None` confirmed in installed source (`homeharvest/core/scrapers/models.py`); `"primary_photo"` column confirmed in `utils.py` `ordered_properties`
+- `httpx>=0.27.0`: available if a server-side photo proxy were needed, but the `referrerPolicy` frontend fix makes it unnecessary
+- `lucide-react` (already in npm deps): `Home` icon available for the styled "No Photo" placeholder
 
 ### Expected Features
 
-**Must have (table stakes — CLI):**
-- Arrow-key navigation throughout with visual focus indicator and back/exit at every screen
-- Rich progress spinner during search (blocking HTTP takes 175+ seconds for large searches)
-- Scrollable, sorted results table in Rich
-- Contextual help overlay (? key pattern from lazygit)
-- Saved searches accessible from main menu
-- First-run setup wizard with SMTP configuration
-
-**Must have (table stakes — web):**
-- Property cards with photo thumbnail, price, beds/baths/sqft, click-through to listing
-- Filter panel (price, beds, baths, sqft) and sort dropdown
-- Loading skeleton states and empty state guidance
-- Responsive layout
-- Results count header ("X homes found")
+**Must have (table stakes):**
+- Property card thumbnail photos rendering in the web dashboard — every reference site (Zillow, Redfin) shows photo thumbnails as the primary visual element; missing photos read as a broken prototype
+- CLI search progress with ZIP-level or per-provider granularity — multi-ZIP searches take 30–90+ seconds; a static spinner with no progress indication reads as frozen
+- Settings and Saved Searches sub-menus that navigate without exceptions — broken navigation in the main menu loop breaks the core UX contract
+- Saved Searches "Run Now" that executes a real search and updates `last_run_at` — silent failure here makes the feature non-functional in practice
+- Clean install verification on a fresh terminal session — the primary distribution path is `pipx install . → homerfindr`; must be shareable
 
 **Should have (differentiators):**
-- ASCII art splash screen with house theme — signals craft, memorable
-- "Launch Web UI" from CLI main menu — bridges both interfaces
-- Global `homerfindr` command — tools that require `cd ~/projects && python main.py` get abandoned
-- HTML email reports (Jinja2 template upgrade from plain text)
-- macOS .app / Dock shortcut via Platypus
+- Per-ZIP progress bar showing "Searching realtor.com [ZIP 3/7]..." — transforms wait time into visible, trust-building feedback
+- Styled "No Photo" placeholder using `lucide-react` `Home` icon instead of a grey `bg-slate-100` rectangle — makes the fallback look intentional, not broken
+- `transient=True` on the `Progress` instance — bar clears on completion, keeping the terminal output clean for the results table
+- End-to-end verification checklist as a living `.planning/` artifact — turns "feels done" into "verified done" for every future release
 
-**Defer:**
-- Inline CLI result comparison — High complexity, limited MVP value
-- Quick-action favorites from CLI — requires new DB table + sync endpoint
-- Client-side favorites/starring
-- Map-based search, user accounts, push notifications, cloud deployment (anti-features)
+**Defer to v2+:**
+- Alt photos gallery/carousel — `homeharvest` returns `alt_photos` but a carousel adds significant React complexity for marginal v1.1 value
+- Photo caching or server-side proxy — browser handles caching naturally; a proxy adds ToS risk, SSRF exposure, and maintenance overhead
+- Automated pytest suite for scraper paths — manual verification checklist covers the same acceptance surface at far lower cost for this milestone
+- New search criteria fields or new providers — touches schema, providers, API, and frontend simultaneously; out of scope for a polish release
 
 ### Architecture Approach
 
-The milestone adds three new surface components on top of the existing layered architecture without modifying the service layer. The Interactive TUI Shell (questionary + Rich + art, living in `homesearch/tui/` or extending `main.py`) drives all CLI interactions and delegates entirely to existing services. A thin Launcher module starts uvicorn in a daemon thread and opens the browser. The React frontend is a visual redesign in-place — no new API endpoints, no new state management, same Vite + TanStack Query stack. Desktop packaging is a configuration concern, not a code concern.
+The v1.1 changes are confined to the surface layer. The existing architecture (Models → Config → Database → Providers → Services → API/CLI → Frontend) remains completely unchanged. Three surface components receive targeted edits; the service layer, database layer, and all providers are untouched.
 
-**Major components:**
-1. **Interactive TUI Shell** — splash, main menu, search wizard, results display, settings/SMTP wizard; delegates to existing service layer
-2. **FastAPI Launcher (daemon thread)** — starts uvicorn non-blocking via `uvicorn.Config` + `uvicorn.Server` in `threading.Thread(daemon=True)`; uses `server.started` flag polling before `webbrowser.open()`
-3. **Redesigned React Web Frontend** — PropertyCard, Dashboard, sortable results grid, filter panel; works entirely with existing `/api/*` endpoints
-4. **Desktop Launcher / Global Command** — `homerfindr` entry point in `pyproject.toml`, `pipx install .` for global use, optional Platypus `.app` for Dock
+**Major components receiving changes:**
+1. `frontend/src/components/PropertyCard.jsx` — add `referrerPolicy="no-referrer"` to `<img>` tag; polish "No Photo" placeholder with `Home` icon from lucide-react
+2. `homesearch/tui/results.py` — replace manual braille spinner with `rich.progress.Progress`; maintain the existing `with Progress` context manager boundary strictly before any questionary call
+3. `homesearch/tui/settings.py` + `homesearch/tui/saved_browser.py` — runtime verification; patch any edge cases surfaced (empty SMTP config KeyError, stale list after delete, first-run re-entry after partial config write)
+
+**What does NOT change:** `search_service.py`, `database.py`, all providers, `models.py`, `api/routes.py`, all other frontend components.
 
 ### Critical Pitfalls
 
-1. **Rich + questionary output corruption** — never run Rich's Live/Progress context concurrently with a questionary/InquirerPy prompt; keep interaction strictly sequential (prompt returns value, then Rich renders). Construct one `Console` instance at startup and pass it everywhere.
+1. **Realtor.com CDN returns 403 for photo URLs from localhost** — the `Referer: http://127.0.0.1:8000` header sent by the browser triggers the CDN hotlink allowlist. Fix with `referrerPolicy="no-referrer"` on the `<img>` tag in `PropertyCard.jsx`. Do not proxy images through FastAPI (ToS risk, SSRF exposure with existing wildcard CORS policy, unnecessary complexity).
 
-2. **Blocking HTTP scraping freezes the interactive spinner** — wrap search calls in `threading.Thread`; show Rich Live spinner on main thread; provide explicit "press Q to cancel" escape; cap ZIP batch size with user warning.
+2. **Rich Live + questionary terminal corruption when adding progress bars** — if any `Rich.Live`/`Progress` context is active when a `questionary.select()` prompt begins, both fight for cursor control and the terminal breaks. The existing code already solves this (`results.py` has a documented "CRITICAL" comment). Any refactoring must keep the single `with Progress(...) as progress:` block and ensure the worker thread never touches the `Progress` object.
 
-3. **Double `/api` prefix 404 bug** — fix `@app.post("/api/search/preview")` route prefix before any web UI work. Verify with a smoke test (does Search return results?) before writing any frontend code.
+3. **Rich Progress task lifecycle race condition** — `progress.advance(task_id)` called from the worker thread after the main thread exits the `with Progress` block raises `RuntimeError` intermittently. Use context manager form only; advance from the main thread via `threading.Event` signals, not directly from the worker.
 
-4. **FastAPI deprecation warnings corrupt Rich output** — fix `@app.on_event("startup")` → `lifespan` context manager before building the CLI launcher; redirect uvicorn subprocess stdout/stderr away from the terminal.
+4. **Redfin photo response key name instability** — the `redfin` package wraps an undocumented API; the key for photo data has varied (`"photoUrl"` vs `"url"` vs `"href"`). The existing multi-shape handling code in `_home_to_listing` is evidence this was already encountered. Before assuming photos work, add one-run diagnostic logging to confirm the actual key name.
 
-5. **macOS .app Gatekeeper failures and Homebrew Python breakage** — ship the global `homerfindr` CLI command via `pipx` first; treat `.app` as optional and use Platypus (shell wrapper) rather than PyInstaller (full Python bundle). Never use `pip install -e .` into system/Homebrew Python for global commands.
+5. **homeharvest DataFrame column name drift** — `homeharvest_provider.py` uses `row.get("primary_photo")` which is confirmed correct from installed source, but minor version bumps have caused column renames before (the `["street", "street_address"]` multi-key fallback is direct evidence). Run `print([c for c in df.columns if "photo" in c.lower()])` during Phase 1 verification before assuming the column name is stable.
 
 ---
 
 ## Implications for Roadmap
 
-Based on combined research, the work falls into four natural phases. Phases 1 and 3 are largely independent and could be parallelized with two developers; Phase 2 depends on Phase 1's menu structure; Phase 4 depends on both Phase 1 (menu hook) and Phase 3 (polished web UI worth launching).
+Based on combined research, the natural phase structure follows feature independence and risk ordering: diagnose first, then fix the highest-visibility gap (photos), then polish the UX (progress bars), then verify the full integrated system.
 
-### Phase 1: Interactive CLI Core
+### Phase 1: Photo Pipeline Verification and Fix
 
-**Rationale:** The arrow-key navigation is the foundation of the entire CLI experience. All other CLI features (SMTP wizard, saved searches, "Launch Web UI" trigger) hang off the main menu structure built here. Fix both blocking bugs (double `/api` prefix is web-only, but the FastAPI startup deprecation affects CLI launch) in this phase to avoid corruption later.
-**Delivers:** Fully interactive CLI with splash screen, arrow-key main menu, search wizard, Rich results table, progress spinner, back/exit at every screen.
-**Addresses:** All CLI table stakes features — arrow-key navigation, progress feedback, scrollable results, visual focus indicators.
-**Avoids:** Pitfall 1 (Rich + questionary conflict), Pitfall 2 (blocking HTTP), Pitfall 11 (deprecation warnings in CLI output).
-**Stack used:** questionary 2.1.1, art 6.5, Rich (existing).
+**Rationale:** Photos are the highest-visibility gap and the fix is the smallest change (one attribute on one JSX element), but diagnosis must come first. Pitfall 5 (homeharvest column name drift) means "no photos" could be a data gap rather than a CDN referer issue — rule that out in minutes before touching frontend code. Sequence: (1) run a real search, log `df.columns`, confirm `photo_url` is populated in SQLite, (2) open DevTools Network tab and check for 403s on `rdcpix.com` URLs, (3) add `referrerPolicy="no-referrer"`, (4) polish the "No Photo" placeholder.
+**Delivers:** Property card thumbnail photos rendering in the web dashboard for both Realtor.com and Redfin listings; styled "No Photo" placeholder with `Home` icon for listings without photos
+**Addresses:** Table stakes — property card thumbnails; differentiator — intentional placeholder design
+**Avoids:** Pitfall 1 (CDN 403 — frontend `referrerPolicy` fix), Pitfall 2 (Redfin key instability — diagnostic logging first), Pitfall 5 (homeharvest column drift — df.columns check first), Pitfall 11 (SSRF from proxy approach — explicitly not using a proxy)
 
-### Phase 2: CLI Settings, SMTP Wizard, and Saved Searches
+### Phase 2: CLI Progress Bar Polish
 
-**Rationale:** Depends on Phase 1's menu structure being in place. First-run setup wizard (SMTP config) is table stakes — email reports silently fail without it. Saved searches browser in CLI completes the core loop.
-**Delivers:** First-run experience that configures SMTP on first launch, settings page with arrow-key SMTP flow, saved searches list/run/delete in CLI.
-**Addresses:** First-run setup wizard, saved searches accessible from main menu, persistent filter state.
-**Avoids:** Pitfall 10 (SMTP wizard credential overwrite — use `python-dotenv` `set_key()`), Pitfall 13 (zero-typing constraint for location — use questionary FuzzyPrompt).
-**Stack used:** questionary (existing from Phase 1), python-dotenv (existing).
+**Rationale:** The spinner upgrade is a contained change to `tui/results.py` with a well-understood pattern and verified API. Doing it after photos keeps the change surface minimal and keeps the terminal corruption pitfall (Pitfall 3) isolated to this phase where it can be specifically tested. The Rich Progress API is fully confirmed from installed source — no guesswork.
+**Delivers:** Per-ZIP progress bar during CLI searches using `rich.progress.Progress`; `transient=True` removes bar on completion; result is a clean terminal with results table following immediately after search
+**Uses:** `rich>=13.7.0` — `Progress`, `SpinnerColumn`, `TextColumn`, `BarColumn`, `MofNCompleteColumn`, `TimeElapsedColumn`; all confirmed present in installed source
+**Avoids:** Pitfall 3 (Rich Live + questionary corruption — single `with Progress` block, worker never touches progress object), Pitfall 4 (task lifecycle race — context manager form only, main-thread advance via events), Pitfall 10 (nested `console.status` + `Live` conflict — keep ZIP discovery status separate from search execution block)
 
-### Phase 3: Web UI Redesign
+### Phase 3: Settings and Saved Searches Wiring Verification
 
-**Rationale:** Independent of CLI phases. Can be built in parallel with Phases 1-2. The double `/api` prefix bug must be fixed as the first commit of this phase — no frontend work before that smoke test passes. Tailwind version must be pinned before any styling. `sortedResults` duplication must be extracted to a shared utility before touching both pages.
-**Delivers:** Professional property card UI with thumbnails, sortable/filterable results grid, saved searches dashboard, loading/empty states, responsive layout.
-**Addresses:** All web table stakes — property cards with photos, filter panel, sort dropdown, loading states, empty states, results count, responsive layout.
-**Avoids:** Pitfall 4 (double `/api` prefix — fix first), Pitfall 8 (Tailwind version pin — check day one), Pitfall 9 (sortedResults duplication — extract before redesign), Pitfall 12 (`result_count` always 0 — remove/fix before building count UI), Pitfall 14 (dedup inconsistency — service-layer dedup before showing counts).
-**Stack used:** shadcn/ui components (new), Tailwind 3.4.x (existing, pinned), React 18 / TanStack Query (existing).
+**Rationale:** This is primarily a verification and edge-case patching phase. All handler dispatch is confirmed correct by code inspection (`menu.py` dispatches to `settings.py` and `saved_browser.py` correctly; both modules implement expected sub-menus). The work is walking every sub-menu path on a real run, surfacing runtime edge cases, and patching them. Sequenced after Phases 1 and 2 because it tests the full integrated system.
+**Delivers:** All four main menu branches (New Search, Saved Searches, Settings, Launch Web UI) confirmed working end-to-end with no exceptions; "Run Now" updates `last_run_at`; delete refreshes list without restart; SMTP wizard handles empty/default config gracefully
+**Avoids:** Pitfall 6 (stale search object post-mutation — awareness only, current code is safe, document for future changes), Pitfall 7 (questionary `default=` type mismatch — validate radius pre-highlighting in Settings after save), Pitfall 8 (first-run wizard skip after partial config write — test Ctrl+C mid-wizard scenario explicitly)
 
-### Phase 4: Bridge, Global Command, and Desktop Packaging
+### Phase 4: End-to-End Install Verification
 
-**Rationale:** Requires Phase 1 CLI menu to hook into and Phase 3 web UI worth launching. This phase connects both interfaces and makes the tool feel like a real desktop application.
-**Delivers:** "Launch Web UI" item in CLI main menu that starts FastAPI in a daemon thread and opens the browser; `homerfindr` global command via pipx; optional Platypus macOS .app for Dock.
-**Addresses:** Global CLI command (table stakes), "Launch Web UI" from CLI (differentiator), macOS .app / Dock shortcut (differentiator).
-**Avoids:** Pitfall 3 (Gatekeeper failures — use Platypus, not PyInstaller; ship pipx first), Pitfall 7 (Homebrew Python breakage — use pipx), Pitfall 15 (APScheduler zombie thread — register `stop_scheduler` in lifespan), Anti-Pattern 2 (blocking uvicorn in main thread — daemon thread only).
-**Stack used:** PyInstaller 6.19.0 (dev dependency, if needed), Platypus (external tool), pipx (user installs).
+**Rationale:** The final gate before calling v1.1 shipped. Tests `pipx install . → homerfindr` on a clean terminal session, walks every CLI and web UI path as a user would, confirms photos render immediately after a fresh search run, and produces the verification checklist as a living artifact for future releases.
+**Delivers:** Documented and executed end-to-end verification checklist covering install, all CLI menu paths, all web UI paths, photo verification, SQLite state checks, and "Run Now" timestamp verification
+**Avoids:** Pitfall 8 (first-run wizard edge cases — explicit clean-install test), Pitfall 9 (stale photo URL expectation — document that photos are best-effort, captured at search time; test immediately after run, not from stale results)
 
 ### Phase Ordering Rationale
 
-- Phase 1 must come before Phase 2 because the settings and saved-searches screens are sub-menus of the main menu built in Phase 1.
-- Phase 3 is independent but benefits from being slightly later so the double-API bug fix and Tailwind pin happen before CSS work begins.
-- Phase 4 must come last because it bridges CLI (Phase 1) and web UI (Phase 3) and the bridge is only valuable once both are polished.
-- The two known bugs (double `/api` prefix, FastAPI startup deprecation) should be addressed as pre-flight fixes before Phases 1 and 3 respectively, not their own phase.
+- Photos first because the diagnosis step (log column names, inspect network tab) informs whether the frontend fix is sufficient or whether provider code also needs attention — this shapes the scope of all subsequent work
+- Progress bar second because it is the highest-risk change (terminal state corruption regression) and benefits from being isolated in its own phase with targeted testing
+- Settings verification third because it tests the integrated system with all prior changes in place
+- Install verification last because it validates the full artifact produced by all prior phases; the checklist becomes a living document for future releases
 
 ### Research Flags
 
-Phases likely needing deeper research during planning:
-- **Phase 4 (macOS .app via Platypus):** Platypus wrapping a pipx-installed command has edge cases around PATH availability in the app-launched Terminal session. Needs validation on a clean machine before declaring complete.
-- **Phase 2 (SMTP validation):** Testing SMTP credentials in the wizard requires a live SMTP server or mock. May need a test-connection utility; research the python-dotenv + smtplib pattern for the wizard.
+Phases with well-documented patterns (no additional research needed):
+- **Phase 1:** `referrerPolicy="no-referrer"` is documented browser spec behavior (W3C Referrer Policy). Rich photo pipeline confirmed from installed package source. Standard patterns.
+- **Phase 2:** `rich.progress.Progress` API confirmed from installed source at `.venv/.../rich/progress.py`. Pattern is established and tested in project already.
+- **Phase 3:** All menu handler dispatch confirmed by direct code inspection. No research needed — only runtime execution and edge-case patching.
+- **Phase 4:** Manual verification checklist. No research needed — only execution discipline and documentation.
 
-Phases with standard patterns (skip research-phase):
-- **Phase 1:** questionary + Rich sequential pattern is well-documented; art library has a one-call API. Standard patterns throughout.
-- **Phase 3:** shadcn/ui has an official Vite install guide; PropertyCard layout is a standard pattern. No research needed.
+No phases require a `/gsd:research-phase` deeper dive during planning. The research is complete and source-verified.
 
 ---
 
@@ -143,48 +127,43 @@ Phases with standard patterns (skip research-phase):
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | All library choices verified against current PyPI releases and official docs; only PyInstaller .app terminal behavior rated MEDIUM |
-| Features | HIGH | Web-verified against Zillow/Redfin/Realtor.com UX patterns and multiple real estate app analyses |
-| Architecture | HIGH | Existing codebase is clean and well-isolated; new components have clear boundaries; uvicorn daemon thread pattern is MEDIUM confidence (community-verified, not official docs) |
-| Pitfalls | HIGH | Majority sourced from internal CONCERNS.md (first-party) and official library docs; Gatekeeper/notarization specifics are MEDIUM |
+| Stack | HIGH | Zero new dependencies confirmed by tracing all three features to already-installed packages; verified from `.venv` source |
+| Features | HIGH | All three feature pipelines verified from installed package source code and first-party codebase inspection; feature gaps confirmed by direct code inspection |
+| Architecture | HIGH | No architectural changes; surface-layer edits only; component boundaries confirmed by existing codebase analysis; no new patterns required |
+| Pitfalls | MEDIUM-HIGH | Rich/questionary terminal corruption and progress race conditions are HIGH confidence (confirmed from existing code comments and official docs); CDN referer behavior is MEDIUM (standard pattern, not officially documented for these specific CDNs) |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **questionary vs InquirerPy discrepancy between research files:** STACK.md recommends questionary; ARCHITECTURE.md uses InquirerPy throughout. Both use prompt_toolkit under the hood. Resolution is questionary (actively maintained), but the architecture patterns in ARCHITECTURE.md are fully applicable — just substitute `questionary.select()` for `InquirerPy list prompts`.
+- **Realtor.com photo coverage rate per search area:** Unknown what percentage of active listings will have `primary_photo` populated. Must be validated during Phase 1 diagnosis. If coverage is low, the `alt_photos` fallback (one-line improvement in `homeharvest_provider.py` using the confirmed `alt_photos` field from installed source) should be added.
 
-- **PyInstaller .app terminal behavior on macOS 15 + Python 3.11:** The STACK.md caveat is real — PyInstaller `--windowed` suppresses stdout for CLI tools. Platypus avoids this entirely. Validate the Platypus approach on a clean machine early in Phase 4 before investing time in PyInstaller .app work.
+- **Redfin photo key name in current live API response:** The `redfin` package wraps an undocumented API. The actual key used (`photoUrl` vs `url` vs `href`) must be confirmed by diagnostic logging during Phase 1 before assuming the current multi-shape handler covers it. This is a 30-second check; do not skip it.
 
-- **Deduplication correctness:** CONCERNS.md documents that address-based deduplication is fragile. This needs to be fixed at the service layer before building result count displays in Phase 3. If dedup is complex, it may warrant its own sub-task or brief research spike.
+- **`referrerPolicy="no-referrer"` effectiveness for Realtor.com CDN specifically:** MEDIUM confidence that suppressing the `Referer` header bypasses the CDN allowlist check. This is the standard browser mechanism for this exact scenario, but CDN-specific behavior is not officially documented by Realtor.com. Validate in DevTools Network tab during Phase 1 before closing the work.
 
-- **APScheduler + lifespan migration:** Two independent bugs (missing `stop_scheduler` shutdown hook and deprecated `@app.on_event`) that need fixing before Phase 4's launcher integration. Small but must not be skipped.
+- **First-run wizard Ctrl+C resilience:** Confirmed as a risk worth testing but not confirmed as a current bug. Test the scenario in Phase 3; add `"setup_complete": true` key (written only at wizard end) only if confirmed broken.
 
 ---
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- questionary PyPI / GitHub (tmbo/questionary) — v2.1.1, Aug 2025, Python 3.9-3.14 confirmed
-- art PyPI — v6.5, Apr 2025, 677+ fonts, MIT license
-- PyInstaller PyPI — v6.19.0, Feb 2026, Python 3.8-3.14 supported
-- shadcn/ui Vite installation guide (ui.shadcn.com/docs/installation/vite) — official Vite setup
-- Rich documentation (rich.readthedocs.io) — Live context, threading, progress, tables
-- pipx documentation (pipx.pypa.io) — global Python CLI install best practice
-- HomeHarvest PyPI / GitHub — 403 blocking behavior documented in README
-- FastAPI CORS docs — wildcard origin confirmed
-- Internal CONCERNS.md — first-party codebase analysis, existing bugs documented
+- `/Users/iamtron/Documents/GitHub/HomerFindr/.venv/lib/python3.11/site-packages/homeharvest/utils.py` — `ordered_properties` confirms `"primary_photo"` column name; `process_result()` confirms extraction logic
+- `/Users/iamtron/Documents/GitHub/HomerFindr/.venv/lib/python3.11/site-packages/homeharvest/core/scrapers/models.py` — `Description.primary_photo: HttpUrl | None` and `alt_photos: list[HttpUrl] | None` confirmed
+- `/Users/iamtron/Documents/GitHub/HomerFindr/.venv/lib/python3.11/site-packages/rich/progress.py` — `Progress`, `add_task()`, `advance()`, `transient` parameter confirmed in installed version
+- Codebase: `homesearch/providers/homeharvest_provider.py`, `homesearch/providers/redfin_provider.py`, `homesearch/tui/results.py`, `homesearch/tui/menu.py`, `homesearch/tui/settings.py`, `homesearch/tui/saved_browser.py`, `frontend/src/components/PropertyCard.jsx`, `homesearch/models.py`, `homesearch/database.py`, `homesearch/api/routes.py`
+- [Rich Progress Display Documentation](https://rich.readthedocs.io/en/latest/progress.html) — `SpinnerColumn`, indeterminate mode via `total=None`, `transient`
+- [Rich Live Documentation](https://rich.readthedocs.io/en/stable/live.html) — Live context mutual exclusivity rule
 
 ### Secondary (MEDIUM confidence)
-- Uvicorn daemon thread pattern (bugfactory.io) — community-verified, not in official uvicorn docs
-- Platypus macOS app wrapper (sveinbjorn.org/platypus) — v5.5.0, Dec 2025
-- PyInstaller Gatekeeper notarization (Apple Developer Forums) — notarized app failure patterns
-- Tailwind v4 dark mode migration (tailwindlabs/tailwindcss GitHub discussion) — config format changes
-- Redfin scraping anti-bot measures (ScrapeOps) — community source
+- [HomeHarvest GitHub — Bunsly/HomeHarvest](https://github.com/Bunsly/HomeHarvest) — `img_src` and `alt_photos` field schema
+- Realtor.com CDN hotlink protection via `Referer` header — standard CDN protection pattern; `referrerPolicy="no-referrer"` is documented W3C browser spec behavior
+- Redfin stingray API response shape instability — inferred from existing multi-shape handling code in `_home_to_listing` (direct evidence of prior API variance encountered during v1.0 development)
+- [Uvicorn background thread pattern — bugfactory.io](https://bugfactory.io/articles/starting-and-stopping-uvicorn-in-the-background/) — already implemented in v1.0's web launcher
 
 ### Tertiary (LOW confidence)
-- InquirerPy GitHub Issues — prompt_toolkit interaction edge cases (browsed, not exhaustively read)
-- Rich GitHub Issues #979, #1530, Discussion #1791 — concurrent Live + input behavior
+- questionary `default=` type matching behavior — confirmed from reading `settings.py` usage patterns; no official doc citation found
 
 ---
 *Research completed: 2026-03-25*

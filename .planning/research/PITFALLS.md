@@ -1,112 +1,93 @@
 # Domain Pitfalls
 
-**Domain:** Python CLI polishing + web UI redesign (home search aggregator)
+**Domain:** v1.1 Polish & Verification — photo fetching, CLI progress bars, menu wiring
 **Researched:** 2026-03-25
+**Scope:** Integration pitfalls when adding these specific features to the existing HomerFindr v1.0 codebase
 
 ---
 
 ## Critical Pitfalls
 
-Mistakes that cause rewrites, blocked features, or shipped regressions.
+Mistakes that cause hours of debugging, broken terminal state, or invisible regressions.
 
 ---
 
-### Pitfall 1: Rich and InquirerPy Outputting to Conflicting Streams
+### Pitfall 1: Realtor.com CDN Returns 403 for Photo URLs When Served From localhost
 
-**What goes wrong:** Rich uses its own `Console` object that writes to `sys.stdout` and detects terminal capabilities (color support, width, TTY). InquirerPy (via `prompt_toolkit`) also takes over terminal input/output directly. When both run simultaneously or in alternating sequence without explicit coordination, you get interleaved output corruption: half-rendered progress bars, blank lines eating the menu, or the cursor left in a broken state after a prompt.
+**What goes wrong:** `homeharvest` populates `primary_photo` with URLs on `ap.rdcpix.com`. When a browser loads the React app from `http://127.0.0.1:8000` and the `<img>` tag requests those CDN URLs, the browser sends a `Referer: http://127.0.0.1:8000` header. The Realtor.com CDN enforces a referer allowlist — it only serves images to requests that look like they originate from `realtor.com`. The request is rejected with a 403.
 
-**Why it happens:** Rich's Live display holds the terminal in a managed state. Any other write to stdout during a Live context — including prompt_toolkit's own rendering — breaks Rich's internal line-count bookkeeping. Rich also does terminal-capability detection at construction time; if InquirerPy initializes first and wraps stdin/stdout, Rich may detect non-interactive mode and disable all color/formatting.
+**Why it looks like a data bug:** The `photo_url` field is non-empty in the API response. The `PropertyCard.jsx` `onError` handler (line 33) silently hides the broken image and shows the "No Photo Available" placeholder. No console error appears unless DevTools is open. The developer sees blank photo slots and suspects the scraper isn't returning photos.
 
-**Consequences:** The CLI looks broken on first launch. ANSI escape sequences leak into output. Progress bars don't clear. The house-loading animation fires before or after menus in a way that corrupts the screen.
+**Consequences:** All Realtor.com property cards show "No Photo Available" even when photo data is present. The bug is invisible without DevTools Network inspection.
 
 **Prevention:**
-- Never run Rich's `Live` or `Progress` context at the same time as an InquirerPy prompt. Exit the Live context fully before launching any interactive prompt.
-- Always construct a single `Console` instance at startup and pass it everywhere — do not let Rich auto-detect and create one inside each function call.
-- Verify with `console.is_terminal` at startup; if False (e.g., output is piped), disable all interactive features gracefully.
-- Test the full CLI flow in both iTerm2 and macOS Terminal.app. They handle ANSI differently.
+- Add `referrerPolicy="no-referrer"` to the `<img>` tag in `PropertyCard.jsx`. This suppresses the `Referer` header and bypasses the CDN hotlink check for static assets.
+- Do not attempt to proxy images through the FastAPI backend — this violates Realtor.com ToS and adds backend complexity for no benefit.
+- The fix is a one-line change to the `<img>` element in `PropertyCard.jsx`.
 
-**Detection:** Cursor appears in the wrong position after a menu selection. Subsequent `console.print()` calls produce blank lines. ASCII art appears mid-menu.
+**Detection:** Open browser DevTools > Network > filter by Img. Look for 403 responses on `rdcpix.com` URLs. The `onError` handler fires silently — add a temporary `console.warn` to surface it during diagnosis.
 
-**Phase:** CLI UX overhaul phase (interactive menus + ASCII art).
+**Phase:** Photo-fetching plan. Fix is frontend-only (`PropertyCard.jsx`), not a backend data problem.
 
 ---
 
-### Pitfall 2: Blocking HTTP Scraping Freezes the Interactive CLI
+### Pitfall 2: Redfin Photo URL Key Name Is Unstable Across API Response Shapes
 
-**What goes wrong:** Both `homeharvest` and `redfin` providers are fully synchronous and call `time.sleep()` internally (1.5–2 seconds per ZIP code). When a user triggers a search from the interactive CLI menu, the entire process blocks — arrow-key menus stop responding, Rich's animated loading spinner freezes, and the terminal appears hung.
+**What goes wrong:** `redfin_provider.py` lines 112–117 handle three photo data shapes: a list of dicts with `"photoUrl"` key, a list of plain strings, and a plain string. The actual Redfin stingray API also returns dicts where the key is `"url"` instead of `"photoUrl"`, or where photo data is nested one level deeper. The `photos[0].get("photoUrl", "")` call returns `""` (not an exception) when the key name differs — producing silently empty `photo_url` strings on all Redfin listings.
 
-**Why it happens:** The existing CONCERNS.md documents this: searches over 50 ZIP codes can take 175+ seconds. The current FastAPI route runs these synchronously. The CLI, which calls the same service layer, inherits the same blocking behavior.
+**Why it happens:** The `redfin` package wraps an undocumented internal API. The existing multi-shape handling code in `_home_to_listing` is evidence this was already known at v1.0 time — but only the shapes encountered then were handled. The API response can vary by listing region, time of day, and search parameters.
 
-**Consequences:** Users think the app crashed. Ctrl+C during a blocking scrape may leave SQLite in a dirty state or leave a half-written database record.
+**Consequences:** Redfin property cards show "No Photo Available" even when photos exist. Indistinguishable from the Realtor.com CDN issue without separate per-provider diagnosis.
 
 **Prevention:**
-- Wrap the search call in a `threading.Thread` when invoked from the CLI. Use a `threading.Event` to signal completion.
-- Show a Rich `Live` spinner that updates on the main thread while the search thread runs in the background.
-- Provide explicit "press Q to cancel" escape during long searches.
-- Cap ZIP code batch size to a configurable maximum (e.g., 20 ZIPs) for interactive CLI use; warn the user if the radius would yield more.
+- Before implementing photo display, diagnose the actual response shape for a Redfin search. Add a temporary `print(f"[Redfin] photos raw: {home_data.get('photos', 'MISSING')}")` to `_home_to_listing` for one search run.
+- Broaden the photo key extraction to try `photoUrl`, `url`, `href`, `src` in order before giving up.
+- Accept that Redfin photo coverage will be partial — use the placeholder gracefully.
 
-**Detection:** Spinner animation freezes the moment a search starts. Terminal stops accepting keystrokes.
+**Detection:** All Redfin listings have empty `photo_url` in the API response JSON. Add `print([c for c in home_data if "photo" in c.lower()])` temporarily to surface the actual key names.
 
-**Phase:** CLI UX overhaul phase — must address before the search wizard is usable.
+**Phase:** Photo-fetching plan — diagnosis step before implementation.
 
 ---
 
-### Pitfall 3: macOS .app Packaging Fails on Apple Silicon / Gatekeeper
+### Pitfall 3: Rich Live + questionary Terminal Corruption When Adding Progress Bars
 
-**What goes wrong:** Python apps packaged with py2app or PyInstaller frequently fail on Apple Silicon Macs unless every bundled C extension is compiled as `arm64` or `universal2`. The hardened runtime required by Gatekeeper notarization is incompatible with cffi/ctypes unless specific entitlements are declared. The result: the `.app` opens fine in development but fails with a "killed" or "not opened" Gatekeeper error on another machine.
+**What goes wrong:** If any `Rich.Live` or `Rich.Progress` context is still active when a `questionary.select()` or `questionary.text()` prompt begins rendering, both fight for cursor control using incompatible ANSI escape sequences. The result: arrow-key prompts appear on top of the spinner frame, cursor positioning breaks, and the terminal enters a state where neither Rich nor questionary renders correctly. Ctrl+C is required to recover.
 
-**Why it happens:**
-- Many Python packages ship only `x86_64` wheels. A `universal2` `.app` bundle that includes an `x86_64`-only `.dylib` will be rejected by codesign validation.
-- PyInstaller requires `com.apple.security.cs.allow-unsigned-executable-memory` entitlement. Without it, the hardened runtime kills the process on launch.
-- Signing with `--deep` (the intuitive approach) does not work correctly for PyInstaller bundles; each binary inside must be signed inside-out.
-- Gatekeeper quarantine flag is set on downloaded `.app` files; unsigned or improperly signed apps are silently blocked.
+**The existing code already solves this correctly.** In `results.py` lines 55–65, a comment reads "CRITICAL: Rich Live must fully exit before any questionary prompt." The `with Live(...) as live:` block exits cleanly before any questionary call. The pitfall is that adding new `Progress` or `Live` contexts while extending `execute_search_with_spinner` will re-introduce the problem.
 
-**Consequences:** The `.app` works perfectly in the developer's environment but cannot be distributed or opened on another machine without terminal workarounds.
+**Specific risk for v1.1:** Replacing the hand-rolled spinner loop with `rich.progress.Progress` — a natural upgrade — will break this invariant if the `Progress` context is opened inside the worker thread or if it outlives the current `with Live` boundary.
+
+**Consequences:** Arrow-key navigation stops working after search results appear. The "Select a listing" questionary prompt renders incorrectly. Regression is obvious but the root cause (leaked Live context) is non-obvious.
 
 **Prevention:**
-- **Prefer a shell script launcher over a full `.app` bundle for personal/friends-and-family distribution.** A `~/.local/bin/homerfindr` shell script that activates the virtualenv and runs the CLI is simpler, more reliable, and avoids the entire Gatekeeper/notarization problem.
-- If a real `.app` is needed: use PyInstaller (not py2app), sign with `arch -arm64` explicitly, declare all required entitlements in a `.entitlements` plist, and sign each `.dylib`/`.so` individually before signing the bundle.
-- Test on a separate machine not used for development before declaring packaging complete.
+- Keep a single `with Progress(...) as progress:` (or `with Live(...) as live:`) block in `execute_search_with_spinner`. Never open one inside `_search_worker` or anywhere the worker thread can reach.
+- The worker thread must not write to the terminal at all — only the main thread's polling loop updates the display.
+- The existing `thread.join(timeout=1.0)` call after the `with Live` block is load-bearing: it ensures the worker is done before any subsequent questionary call. Do not move it inside the `with` block.
+- After any change, test: run a search from the TUI, let it complete, then verify arrow keys work correctly in the "Select a listing to open" questionary prompt.
 
-**Detection:** Works locally but shows "cannot be opened because the developer cannot be verified" on another Mac. Or the app opens and immediately quits silently.
+**Detection:** After a search completes, the arrow-key listing selector renders garbled or does not respond to key presses. The Live context leaked.
 
-**Phase:** Desktop packaging phase. Recommend deferring full `.app` to a later milestone; ship the global CLI command first.
+**Phase:** CLI animation polish plan. This is the primary implementation risk for that plan.
 
 ---
 
-### Pitfall 4: The `previewSearch` Double-`/api` Prefix Bug Blocks the Core Search Flow
+### Pitfall 4: Rich Progress Task Lifecycle Race Condition
 
-**What goes wrong:** The existing codebase has a documented bug (CONCERNS.md) where the preview endpoint is defined at `@app.post("/api/search/preview")` in routes.py, while `api.js` prepends the `/api` base, resulting in a 404 on every preview search. Users clicking Search get no results and no error message (errors are `console.error` only).
+**What goes wrong:** When using `rich.progress.Progress` with a background thread, developers often call `progress.advance(task_id, 1)` from the worker thread after the main thread has already exited the `with Progress` block. This raises `RuntimeError` or silently does nothing depending on Rich version, and is a race condition — it manifests intermittently.
 
-**Why it matters for the redesign:** Any web UI redesign that keeps the existing `api.js` client and routes.py as-is will inherit this broken search flow. Building new property card components on top of a broken search path wastes implementation time.
+A variant: `progress.add_task(...)` called before `progress.start()` (when using manual lifecycle management), or `progress.stop()` called from the worker thread at the wrong time.
 
-**Prevention:**
-- Fix the route prefix before touching the web UI. Either remove the `/api` prefix from the route definition (making it `@app.post("/search/preview")`) so the Vite proxy handles it correctly, or strip the `/api` base prefix from `api.js`.
-- Add a basic smoke test: does clicking Search return results? Verify before starting the visual redesign.
-
-**Detection:** Browser network tab shows 404 on `/api/api/search/preview`. No results appear after clicking Search.
-
-**Phase:** Must be fixed in the first task of the web UI redesign phase, before any frontend work.
-
----
-
-### Pitfall 5: Provider Scraping Can Be Blocked Without User Feedback
-
-**What goes wrong:** Both `homeharvest` and `redfin` wrap unofficial internal APIs. Redfin uses bot detection and IP rate limiting. HomeHarvest returns a 403 Forbidden when blocked. The current codebase catches errors in `run_search` and swallows them — the user sees an empty result set with no indication that a provider was blocked.
-
-**Why it happens:** Rate limiting is intermittent and session-dependent. A search that works fine 10 times may hit a block on the 11th. The CLI's new animated search experience makes this worse: the spinner completes "successfully" but returns zero homes.
-
-**Consequences:** User concludes the tool is broken or there are no homes matching criteria, when the real problem is a temporary block. Trust in the tool erodes.
+**Why it happens:** The search runs in a background thread (`_search_worker`) whose completion time relative to the main thread's `with Progress` exit is not deterministic. Any `advance()` call from the worker that races with the main thread's `__exit__` can produce the error.
 
 **Prevention:**
-- Distinguish `ProviderBlockedError` from legitimate zero-result responses. Log the HTTP status code.
-- Surface a clear CLI message: "Realtor.com returned a 403 — you may have been rate-limited. Try again in a few minutes."
-- Implement per-provider health checks that can be displayed in a CLI status panel.
-- Do not retry automatically in a loop — this deepens the block.
+- Use `with Progress(...) as progress:` exclusively — never call `.start()` / `.stop()` manually.
+- For the simplest correct implementation: keep the progress display entirely in the main thread's polling loop (as the current hand-rolled spinner already does). Advance an indeterminate `SpinnerColumn` task based on elapsed time rather than worker callbacks. The worker thread never touches the `progress` object.
+- If per-provider progress steps are desired (e.g., "Searching realtor... done"), pass a `threading.Event` per provider and advance from the main thread when the event is set — not from the worker.
 
-**Detection:** Zero results on searches that previously returned data. No error surfaced to the user.
+**Detection:** `RuntimeError: progress is not started` in traceback. Happens intermittently; more likely on fast searches where the worker finishes before the first polling iteration completes.
 
-**Phase:** CLI search wizard phase; also applies to web UI search flow.
+**Phase:** CLI animation polish plan.
 
 ---
 
@@ -114,95 +95,86 @@ Mistakes that cause rewrites, blocked features, or shipped regressions.
 
 ---
 
-### Pitfall 6: ASCII Art Breaks on Narrow Terminals or Non-UTF-8 Locales
+### Pitfall 5: homeharvest DataFrame Column Names Can Drift Between Package Versions
 
-**What goes wrong:** pyfiglet renders ASCII art at a fixed character width determined by the font. Most figlet fonts render "HomerFindr" at 60–90 characters wide. On a terminal narrower than the art (e.g., a split-pane tmux window, or a 80-column macOS Terminal.app default), the art wraps mid-character, producing visual noise. On terminals with non-UTF-8 locale (`LANG=C`), Unicode block characters used by some `art` library fonts produce `UnicodeEncodeError` at startup.
+**What goes wrong:** `homeharvest_provider.py` accesses DataFrame columns by name: `row.get("primary_photo")` with `row.get("img_src")` as fallback. The `homeharvest` package has changed column names across minor versions — the existing multi-key fallback for `["street", "street_address"]` (lines 72–75) is direct evidence of a previous rename. The photo column is only guarded by two candidates. If `homeharvest` renames `primary_photo` to something else (e.g., `photo_url`, `main_image`), photo extraction silently returns empty strings.
+
+**Why it matters for v1.1:** The photo-fetching plan assumes the scraper is already returning valid photo data. If the column name has drifted since v1.0, the plan's starting assumption is wrong and no amount of frontend work will fix it.
 
 **Prevention:**
-- Query terminal width with `os.get_terminal_size().columns` before rendering. If width < art width, fall back to a shorter single-line logo or plain text header.
-- Use only ASCII-safe figlet fonts (avoid fonts that use Unicode box-drawing characters). The standard `slant`, `banner3`, or `doom` fonts are safe.
-- Wrap the art render in a try/except `UnicodeEncodeError` and fall back gracefully.
-- Test the splash screen in a narrow terminal (60 columns) before shipping.
+- During the verification phase, run one search and log actual column names: `print([c for c in df.columns if "photo" in c.lower()])`. Confirm `primary_photo` or `img_src` is present.
+- This is a 30-second diagnostic that should precede any photo display work.
 
-**Detection:** Art wraps visually at startup. `UnicodeEncodeError` traceback on some systems.
+**Detection:** Zero `photo_url` values from Realtor.com results despite listings being returned. Narrow to column names before assuming a CDN issue.
 
-**Phase:** ASCII art / splash screen implementation.
+**Phase:** End-to-end verification plan — run this check first.
 
 ---
 
-### Pitfall 7: Global CLI Command Breaks When Homebrew Updates Python
+### Pitfall 6: saved_browser.py Stale Search Object After Mutation
 
-**What goes wrong:** Installing `homerfindr` globally via `pip install -e .` or a symlink to a venv's Python puts a hard path to a specific Python binary in the script shebang. When Homebrew updates Python (which it does automatically as a dependency of other packages), the shebang path becomes stale. The command silently fails or raises `No module named homesearch`.
+**What goes wrong:** `show_saved_searches_browser` fetches all searches at the top of its `while True` loop, then passes a specific `search` object into `_show_search_submenu`. After `_toggle_active` or `_rename_search` mutates the DB record, the in-memory `search` object is stale. On the next loop iteration the table is re-fetched (correct), but within a single submenu invocation, the stale object is still used.
+
+**Current safety:** `_toggle_active` reads `search.is_active` to compute the new state — this is correct behavior for a toggle even with a stale object. `_rename_search` and `_delete_search` use only `search.id`, which never changes. Confirmation messages use the freshly-written value (e.g., `new_name.strip()`), not a read-back from the stale object. **No bug currently exists.**
+
+**The risk:** If the submenu is extended (e.g., adding "Edit Criteria" or "Duplicate") and new code reads `search.name` or `search.criteria` after a rename/edit to display a confirmation, it will show stale data.
 
 **Prevention:**
-- Use `pipx install .` for global CLI installation. pipx manages isolated environments per app and handles Python upgrades gracefully.
-- Document `pipx` as the recommended install method in the project README.
-- Avoid `pip install -e .` into the system Python or a Homebrew Python for global commands.
-- The shell wrapper approach (a `homerfindr` shell script in `~/.local/bin` that activates the project venv) is brittle for the same reason — use pipx instead.
+- No change needed now. Document this as known: the `search` object inside `_show_search_submenu` is a point-in-time snapshot.
+- Any future actions that need current state must re-fetch: `db.get_saved_search(search.id)`.
 
-**Detection:** `homerfindr` command works, then starts failing after a macOS update or Homebrew upgrade.
-
-**Phase:** Desktop packaging / global command phase.
+**Phase:** Menu wiring verification — awareness, no fix required.
 
 ---
 
-### Pitfall 8: Tailwind v3 vs v4 Dark Mode and Configuration Mismatch
+### Pitfall 7: questionary.select default= Type Mismatch Silently Picks First Item
 
-**What goes wrong:** The existing React/Vite frontend uses Tailwind CSS (version not pinned in the known codebase state). Tailwind v4, released in 2025, changed the configuration format significantly — `tailwind.config.js` is deprecated in favor of CSS `@import` directives. The dark mode strategy changed between v3.4.1 and v4. If the redesign adds new Tailwind config without pinning the version, a `npm install` on a fresh machine may pull v4, breaking all existing dark mode classes and custom configuration.
+**What goes wrong:** `questionary.select(..., default=<value>)` matches the default by equality against the `choices` list (or `Choice.value` for `Choice` objects). If types don't match — e.g., `default=25` (int) when choices are strings like `"25 miles"` — no default is highlighted and questionary silently selects the first item.
+
+**Current exposure in `settings.py` line 138:** `default=d.get("radius", 25)` is an int; choices are `Choice(value=5)`, `Choice(value=10)`, etc. — also ints. This currently works. But `_show_search_defaults` also uses `default=d.get("listing_type", "sale")` with string choices — also correct.
+
+**The risk for v1.1:** If the wizard or settings defaults are extended and a new `select` prompt uses a string choice list with an int default (or vice versa), the default highlight silently breaks — no exception, no warning, just wrong UX.
 
 **Prevention:**
-- Pin the Tailwind version explicitly in `package.json` (`"tailwindcss": "^3.4.x"`) before starting the redesign.
-- Audit the current Tailwind version in use and commit it before any styling work.
-- If upgrading to v4 is desired, do it as a standalone commit before any design work, not interleaved.
+- When adding any new `questionary.select` with a `default=`, verify the default type matches the choice type. String choices → string default. `Choice(value=int)` → int default.
+- Test the Settings > Search Defaults > Radius prompt: the saved radius value should be pre-highlighted. If the first item is always highlighted regardless of saved value, a type mismatch has been introduced.
 
-**Detection:** `dark:` classes stop applying after a fresh `npm install`. Custom colors from `tailwind.config.js` are ignored.
+**Detection:** Settings sub-menu always shows the first option highlighted regardless of what was previously saved.
 
-**Phase:** Web UI redesign phase — check on day one.
+**Phase:** Menu wiring verification.
 
 ---
 
-### Pitfall 9: `sortedResults` Duplication Creates Silent UI Inconsistency
+### Pitfall 8: First-Run Wizard Is Skipped After a Partial Config Write
 
-**What goes wrong:** CONCERNS.md documents that the sort function is copy-pasted identically into `NewSearch.jsx` and `SearchResults.jsx`. The web UI redesign will touch both pages for visual updates. If sort logic is updated in one file and not the other (easy mistake during a large redesign), users see different sort behavior on the same data depending on which page they're on.
+**What goes wrong:** `config_exists()` in `tui/config.py` checks whether the config file exists on disk. If the first-run wizard calls `save_config` partway through (e.g., after the SMTP step) and the user then Ctrl+Cs out, the config file exists on the next launch. `config_exists()` returns `True` and the wizard is skipped entirely — even though setup is incomplete.
+
+**Why it matters for v1.1 verification:** The verification plan tests a "clean install" scenario. If the tester runs the wizard, Ctrl+Cs mid-way, and relaunches, they expect the wizard to re-appear. Instead they get the main menu with a broken or incomplete config.
 
 **Prevention:**
-- Extract to `frontend/src/utils/sortListings.js` as the first task of the web UI phase, before touching any visual code.
-- This is a small refactor (30 minutes) with a large safety payoff.
+- Test this scenario explicitly during verification: delete `~/.homesearch/config.json`, launch, enter the first-run wizard, Ctrl+C after the first question, relaunch.
+- If the wizard is confirmed to skip: add a `"setup_complete": true` key that is only written at the very end of the first-run wizard. Change `config_exists()` to check for this key, not just file existence.
 
-**Detection:** Sort order differs between the New Search results view and the Saved Search results view.
+**Detection:** Delete config, launch, Ctrl+C mid-wizard, relaunch. Does the wizard re-appear?
 
-**Phase:** Web UI redesign phase — pre-flight cleanup step.
+**Phase:** End-to-end verification plan. Diagnose first; fix only if confirmed broken.
 
 ---
 
-### Pitfall 10: SMTP Wizard Stores Credentials in Memory Across CLI Sessions
+### Pitfall 9: Photo URLs Stored in SQLite Expire Over Time
 
-**What goes wrong:** The SMTP setup wizard (interactive arrow-key flow for configuring email) will collect the SMTP password via InquirerPy's password prompt. If the wizard writes this to the `.env` file directly (the natural approach), it overwrites any existing `.env` content, may introduce encoding issues if the password contains special characters, and creates a second code path for managing `.env` that can diverge from the documented setup.
+**What goes wrong:** `photo_url` is scraped at search time and persisted in SQLite. Real estate CDN URLs for both Realtor.com and Redfin embed content-hash tokens or query parameters (e.g., `?w=1024&q=80&c=1`). These URLs are valid for days to weeks but can expire. A user who views the web dashboard weeks after their last search run may see all placeholder images even for listings that previously showed photos.
 
-**Prevention:**
-- Use Python's `python-dotenv` `set_key()` function to update individual keys in `.env` without overwriting the file.
-- Mask the password in CLI display (InquirerPy's `PasswordPrompt` handles this by default).
-- Show a confirmation message that the key was written, but never echo the value back.
-- Validate SMTP credentials immediately after saving by attempting a test connection — do not wait for the user to trigger a report.
-
-**Detection:** SMTP wizard completes but the next report send fails. Or the `.env` file loses other keys after the wizard runs.
-
-**Phase:** SMTP wizard / settings phase.
-
----
-
-### Pitfall 11: FastAPI Startup Event Deprecation Warning Clutters CLI Output
-
-**What goes wrong:** CONCERNS.md flags that `@app.on_event("startup")` is deprecated in FastAPI in favor of the `lifespan` context manager. When the CLI launches the FastAPI server in a subprocess, deprecation warnings from the server leak into the CLI's stdout if not suppressed. These warnings break Rich's rendering of the UI because unexpected lines appear before the Rich console takes control.
+**Why this is acceptable:** The existing `onError` handler in `PropertyCard.jsx` (line 33) already falls back gracefully to "No Photo Available". No user-facing crash occurs.
 
 **Prevention:**
-- Fix the `lifespan` migration before building the CLI launcher that starts the server.
-- When launching FastAPI as a subprocess from the CLI, redirect uvicorn's stdout/stderr to a log file or suppress it: `stdout=subprocess.DEVNULL` or route to a `logging.FileHandler`.
-- Never let the subprocess share the parent process's stdout when Rich has control of the terminal.
+- Do not attempt to re-fetch or proxy photo URLs on demand — disproportionate complexity for a personal tool.
+- Document as expected behavior: photos are best-effort, captured at search time.
+- For the verification checklist: test photo display immediately after a search run (should show photos) and note that stale results from weeks ago may show placeholders.
 
-**Detection:** Deprecation warning text appears over the ASCII art splash or menu on first launch.
+**Detection:** Stored results from a past search show all placeholder images. Inspect URL in DevTools — 404 confirms expiry rather than a CDN referer block (which returns 403).
 
-**Phase:** CLI server-launch integration.
+**Phase:** No action needed. Document as known limitation in the verification checklist.
 
 ---
 
@@ -210,85 +182,77 @@ Mistakes that cause rewrites, blocked features, or shipped regressions.
 
 ---
 
-### Pitfall 12: `result_count` Always Returns 0 on Dashboard
+### Pitfall 10: Rich console.status and Live Are Mutually Exclusive
 
-**What goes wrong:** `SavedSearch.result_count` is always 0 (model field with no backing column). A dashboard "Recent Searches" component that displays result counts will always show "0 results" for every saved search, making the feature look broken.
+**What goes wrong:** `console.status(...)` is a convenience wrapper around `Live`. Calling `console.status` while a `Live` context is active raises `RuntimeError: Only one live display may be active at a time`.
 
-**Prevention:** Remove the field from the model entirely (safest for the redesign), or add the database column and populate it during search runs. Do not wire up a UI widget that reads this field without fixing the underlying model.
+**Current exposure:** `wizard.py` line 254 uses `with console.status("Discovering ZIP codes...")` during the wizard flow. `results.py` uses `with Live(...)` during search execution. These run at different stages so there is no current conflict.
 
-**Phase:** Web dashboard redesign — check before building the saved searches overview component.
+**The risk for v1.1:** If ZIP discovery is moved inside the same animated block as the search execution progress bar (e.g., to show a single unified loading screen), both will be active simultaneously and the error will fire.
+
+**Prevention:**
+- Keep the ZIP discovery `console.status` separate from the search execution `with Live/Progress` block.
+- If a unified display is desired, replace both with a single `with Progress(...) as progress:` instance that has separate tasks for each stage.
+
+**Detection:** `RuntimeError: Only one live display may be active at a time` at runtime during a search. Happens immediately and deterministically — easy to diagnose.
+
+**Phase:** CLI animation polish plan. Awareness only — no current conflict.
 
 ---
 
-### Pitfall 13: InquirerPy "Zero Typing" Constraint Conflicts With Free-Text Fields
+### Pitfall 11: CORS Wildcard + Future Photo Proxy Endpoint
 
-**What goes wrong:** The project requirement is "zero typing" — all navigation via arrows and Enter. However, the existing search model includes fields like `location` (city/ZIP text) that have no natural enumerated option list. Attempting to make everything arrow-key navigable forces either: (a) a dropdown of hard-coded metro areas (not flexible), or (b) a text input prompt (violates the zero-typing goal).
+**What goes wrong:** `routes.py` lines 31–35 sets `allow_origins=["*"]`. For a local-only tool this is acceptable. However, if a `/api/proxy-photo?url=...` endpoint were added to work around CDN hotlink issues, the wildcard CORS policy would mean any page open in the browser could use it to fetch arbitrary URLs through the local server — a potential SSRF vector.
 
 **Prevention:**
-- Define the scope explicitly before implementation: "zero typing" applies to criteria fields with enumerated values (price range, beds, baths, sqft, etc.). Location entry uses a text prompt with autocomplete from previously used locations.
-- InquirerPy's `FuzzyPrompt` provides a type-to-filter autocomplete that preserves the keyboard-first feel while allowing location entry — use it for the location field.
-- Do not attempt to create dropdown lists of ZIP codes or cities; this creates a UX worse than typing.
+- Do not add a photo proxy endpoint. The `referrerPolicy="no-referrer"` fix on the `<img>` tag is the correct approach and requires no backend change.
+- If a proxy is ever considered, restrict CORS to specific local origins first.
 
-**Phase:** Search wizard implementation.
+**Phase:** Photo-fetching plan. Prevention: choose the frontend-only fix (Pitfall 1).
 
 ---
 
-### Pitfall 14: Deduplication Across CLI and Web Shows Different Result Counts
+### Pitfall 12: daemon Thread Hang on Provider Network Timeout
 
-**What goes wrong:** Address-based deduplication is fragile (documented in CONCERNS.md). If the web UI redesign displays result counts prominently (e.g., "47 homes found") and those counts differ between the CLI and web results for the same search — because one path deduplicates and another doesn't — users will distrust the tool.
+**What goes wrong:** In `results.py`, the search runs in a `threading.Thread(daemon=True)`. If `run_search` hangs indefinitely (e.g., `homeharvest.scrape_property` blocking on a slow network request with no timeout), `done_event` is never set. The main thread's `with Live` polling loop runs forever — the spinner animates forever and the TUI appears hung.
 
-**Prevention:**
-- Deduplication must happen in the service layer, not in the frontend or CLI display layer.
-- Fix the `(source, source_id)` primary dedup key before the redesign makes result counts visible.
-- Do not add result count badges to the UI until dedup correctness is validated.
-
-**Phase:** Web UI redesign — do not build result count displays until dedup is fixed.
-
----
-
-### Pitfall 15: Scheduler Thread Outlives CLI Process on Ctrl+C
-
-**What goes wrong:** CONCERNS.md documents that `stop_scheduler()` is never called and the APScheduler background thread has no shutdown hook. If the CLI starts the FastAPI server and the user hits Ctrl+C, the server process may exit but the APScheduler thread continues running in a zombie state until the OS cleans it up.
+**Why it matters for verification:** The verification phase tests against real network conditions. A slow or unresponsive Realtor.com endpoint will expose this.
 
 **Prevention:**
-- Register the `stop_scheduler` shutdown on the FastAPI `lifespan` (part of the `@app.on_event` migration fix).
-- When the CLI launches the server as a subprocess, use `signal.SIGTERM` to shut it down cleanly on CLI exit.
+- The existing `time.sleep(1.5)` per ZIP in `homeharvest_provider.py` provides implicit progress but not a hard timeout.
+- For the verification checklist: note the maximum expected wait time for a typical search (e.g., 20 ZIPs × 1.5s = 30 seconds). If a search runs longer than 2× this, assume a hang.
+- A simple guard: track total elapsed time in the main thread polling loop. If elapsed exceeds a configured maximum (e.g., 5 minutes), break out of the loop and display a timeout message. This is a low-priority hardening task, not a blocker.
 
-**Phase:** Server launcher integration in the CLI.
+**Detection:** Spinner animates indefinitely. Ctrl+C exits cleanly (caught by `KeyboardInterrupt` in `run_menu_loop`), confirming the main thread is alive but waiting.
+
+**Phase:** CLI animation polish / verification. Low priority.
 
 ---
 
 ## Phase-Specific Warnings
 
 | Phase Topic | Likely Pitfall | Mitigation |
-|-------------|---------------|------------|
-| ASCII art splash | Art width overflow on narrow terminals | Check `os.get_terminal_size()` before rendering; have a fallback |
-| Interactive menus | Rich + InquirerPy output conflict | Never run Live context concurrently with InquirerPy prompts |
-| Search wizard | Blocking HTTP during arrow-key flow | Background thread + Rich spinner; escape key to cancel |
-| SMTP wizard | Credential overwrite in .env | Use `python-dotenv` `set_key()`, not full-file write |
-| Web UI redesign | Double `/api` prefix 404 on preview search | Fix route prefix bug before writing any new frontend code |
-| Web UI redesign | Tailwind version mismatch on fresh install | Pin Tailwind version before styling work begins |
-| Web dashboard | result_count always 0 | Remove or fix model field before building count displays |
-| Global CLI command | Breaks after Homebrew Python update | Use pipx for global install, document in README |
-| macOS .app | Gatekeeper rejection, ARM64 failures | Ship shell script launcher first; defer full .app bundle |
-| Provider scraping | Silent 403 block with zero results | Add ProviderBlockedError distinction and user-facing message |
-| FastAPI subprocess | Deprecation warnings corrupt Rich output | Fix lifespan migration; redirect subprocess stdout |
+|---|---|---|
+| Photo display in React | Realtor.com CDN 403 (Pitfall 1) | Add `referrerPolicy="no-referrer"` to `<img>` in `PropertyCard.jsx` |
+| Photo data from Redfin | Unstable response key name (Pitfall 2) | Debug-log raw photo shape before assuming the key name |
+| Photo data from homeharvest | Column name drift between versions (Pitfall 5) | Log `[c for c in df.columns if "photo" in c.lower()]` during verification |
+| CLI progress bars | Rich Live + questionary terminal corruption (Pitfall 3) | Keep single `with Live/Progress` block; worker thread never touches the display |
+| CLI progress bars | Progress task lifecycle race (Pitfall 4) | Use context manager form only; advance from main thread, not worker |
+| CLI progress bars | Nested console.status + Live conflict (Pitfall 10) | Keep ZIP discovery status separate from search execution Live block |
+| Menu wiring verification | Stale search object post-mutation (Pitfall 6) | Awareness only; current code is safe; do not read-back from stale object |
+| Menu wiring verification | questionary default= type mismatch (Pitfall 7) | Verify radius default highlights correctly in Settings after a save |
+| End-to-end verification | First-run wizard skips after partial config (Pitfall 8) | Test Ctrl+C mid-wizard scenario explicitly |
+| End-to-end verification | Stale DB photo URLs show as placeholder (Pitfall 9) | Document as known; test photos immediately after a search run |
+| Photo proxy (avoid this approach) | CORS wildcard SSRF exposure (Pitfall 11) | Use frontend-only `referrerPolicy` fix instead |
 
 ---
 
 ## Sources
 
-- [InquirerPy GitHub Issues](https://github.com/kazhala/InquirerPy/issues) — known prompt_toolkit interactions (LOW confidence, GitHub issues browsed)
-- [Rich Live Display docs](https://rich.readthedocs.io/en/latest/live.html) — Live context threading and overflow behavior (HIGH confidence, official docs)
-- [Rich Issue #979 — track() inside Live()](https://github.com/willmcgugan/rich/issues/979) — component incompatibility (MEDIUM confidence, GitHub issue)
-- [Rich Issue #1530 — thread safety](https://github.com/Textualize/rich/issues/1530) — Live + console threading (MEDIUM confidence, GitHub issue)
-- [Rich Discussion #1791 — input during Live](https://github.com/Textualize/rich/discussions/1791) — prompting during Live context (MEDIUM confidence, GitHub discussion)
-- [py2app FAQ](https://py2app.readthedocs.io/en/latest/faq.html) — dependency and framework issues (HIGH confidence, official docs)
-- [PyInstaller Gatekeeper notarization thread](https://developer.apple.com/forums/thread/695989) — notarized app failures (MEDIUM confidence, Apple Developer Forums)
-- [pipx documentation](https://github.com/pypa/pipx) — global Python CLI install best practice (HIGH confidence, official project)
-- [pipx PATH issue on macOS](https://github.com/pipxproject/pipx/issues/461) — PATH resolution failure (MEDIUM confidence, GitHub issue)
-- [Tailwind v4 dark mode migration](https://github.com/tailwindlabs/tailwindcss/discussions/16517) — config format changes breaking dark mode (MEDIUM confidence, official GitHub discussion)
-- [HomeHarvest PyPI / GitHub](https://github.com/ZacharyHampton/HomeHarvest) — 403 blocking behavior (HIGH confidence, official README)
-- [Redfin Scraping via ScrapeOps](https://scrapeops.io/websites/redfin/) — anti-scraping measures (MEDIUM confidence, community source)
-- [FastAPI CORS docs](https://fastapi.tiangolo.com/tutorial/cors/) — wildcard origin and credential behavior (HIGH confidence, official docs)
-- Internal CONCERNS.md — existing codebase issues used directly (HIGH confidence, first-party analysis)
+- Source code analysis (first-party, HIGH confidence): `homesearch/providers/homeharvest_provider.py`, `homesearch/providers/redfin_provider.py`, `homesearch/tui/results.py`, `homesearch/tui/wizard.py`, `homesearch/tui/saved_browser.py`, `homesearch/tui/settings.py`, `homesearch/tui/menu.py`, `frontend/src/components/PropertyCard.jsx`, `homesearch/api/routes.py`
+- Rich Live/Progress mutual exclusivity: https://rich.readthedocs.io/en/stable/live.html (HIGH confidence, official docs)
+- Rich threading behavior and Live context exclusivity: confirmed from existing code comments in `results.py` ("CRITICAL: Rich Live must fully exit before any questionary prompt") — HIGH confidence
+- Realtor.com CDN hotlink protection via Referer: MEDIUM confidence — standard CDN protection pattern; the `referrerPolicy="no-referrer"` mitigation is a documented browser spec behavior, not a workaround
+- Redfin stingray API response shape instability: MEDIUM confidence — the existing multi-shape handling in `_home_to_listing` confirms this was encountered at v1.0 time
+- homeharvest column name drift: MEDIUM confidence — the `["street", "street_address"]` multi-key fallback in `_row_to_listing` is direct evidence of a prior rename
+- questionary `default=` type matching: MEDIUM confidence — confirmed from reading `settings.py` usage and questionary source behavior; no official doc citation found

@@ -262,25 +262,18 @@ def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
         ).ask()
 
     def _c(question: str, choices: list, **kw) -> list | str | None:
-        """checkbox followed by a Continue / ← Back nav prompt."""
+        """checkbox with ← Back as the last item. Selecting it goes back."""
+        all_choices = list(choices) + [questionary.Choice("← Back", value=_BACK)]
         answers = questionary.checkbox(
             question,
-            choices=list(choices),
+            choices=all_choices,
             style=HOUSE_STYLE,
             instruction="(Space to select, Enter to confirm)",
             **kw,
         ).ask()
         if answers is None:
             return None
-        nav = questionary.select(
-            "",
-            choices=[
-                questionary.Choice("✓  Continue", value="ok"),
-                questionary.Choice("← Back", value=_BACK),
-            ],
-            style=HOUSE_STYLE,
-        ).ask()
-        if nav is None or nav == _BACK:
+        if _BACK in answers:
             return _BACK
         return answers
 

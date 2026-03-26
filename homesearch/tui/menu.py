@@ -55,6 +55,8 @@ def run_menu_loop():
             console.print("\n[bold cyan]Goodbye! \U0001f3e0[/bold cyan]")
             break
 
+    _cleanup_server()
+
 
 def _handle_new_search():
     """Run the full search flow: wizard -> spinner -> results -> save."""
@@ -83,5 +85,30 @@ def _handle_settings():
 
 
 def _handle_web_ui():
-    """Stub — Phase 4 implements web UI launch from CLI."""
-    console.print("[dim]Web UI launch will be available in a future update.[/dim]")
+    """Start background FastAPI server and open browser."""
+    from homesearch.tui.web_launcher import start_server, is_running, get_port
+    from homesearch.config import settings
+    import webbrowser
+
+    if is_running():
+        url = f"http://{settings.host}:{get_port()}"
+        console.print(f"[green]Web UI already running at {url} — opening browser[/green]")
+        webbrowser.open(url)
+        return
+
+    console.print("[dim]Starting web UI...[/dim]")
+    try:
+        port = start_server(settings.host, settings.port)
+        url = f"http://{settings.host}:{port}"
+        console.print(f"[bold green]Web UI running at {url}[/bold green]")
+        webbrowser.open(url)
+    except RuntimeError as e:
+        console.print(f"[bold red]Could not start web UI: {e}[/bold red]")
+
+
+def _cleanup_server():
+    """Shut down background web server if running."""
+    from homesearch.tui.web_launcher import stop_server, is_running
+    if is_running():
+        console.print("[dim]Shutting down web server...[/dim]")
+        stop_server()

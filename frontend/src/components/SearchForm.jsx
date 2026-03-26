@@ -6,6 +6,7 @@ const LISTING_TYPES = [
   { value: 'sale', label: 'Buy' },
   { value: 'rent', label: 'Rent' },
   { value: 'sold', label: 'Sold' },
+  { value: 'coming_soon', label: 'Coming Soon' },
 ]
 
 const PROPERTY_TYPES = [
@@ -23,7 +24,7 @@ const TRISTATE = [
   { value: false, label: 'No' },
 ]
 
-export default function SearchForm({ onResults, onLoading }) {
+export default function SearchForm({ onSearch, onLoading }) {
   const [criteria, setCriteria] = useState({
     location: '',
     radius_miles: 25,
@@ -48,7 +49,6 @@ export default function SearchForm({ onResults, onLoading }) {
     zip_codes: [],
   })
   const [zipResults, setZipResults] = useState([])
-  const [loading, setLoading] = useState(false)
   const [zipLoading, setZipLoading] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const [saveName, setSaveName] = useState('')
@@ -101,22 +101,8 @@ export default function SearchForm({ onResults, onLoading }) {
   }
 
   const handleSearch = async (save = false) => {
-    setLoading(true)
-    onLoading?.(true)
-    try {
-      const c = buildCriteria()
-      let data
-      if (save && saveName) {
-        data = await api.createSearch(c, saveName)
-      } else {
-        data = await api.previewSearch(c)
-      }
-      onResults?.(data)
-    } catch (e) {
-      console.error('Search failed:', e)
-    }
-    setLoading(false)
-    onLoading?.(false)
+    const c = buildCriteria()
+    onSearch?.(c, save ? saveName : null)
   }
 
   return (
@@ -141,7 +127,7 @@ export default function SearchForm({ onResults, onLoading }) {
               disabled={zipLoading || !criteria.location}
               className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 text-sm whitespace-nowrap"
             >
-              {zipLoading ? <Loader2 size={16} className="animate-spin" /> : 'Find ZIPs'}
+              {zipLoading ? <Loader2 size={16} className="animate-spin" /> : 'Preview ZIPs'}
             </button>
           </div>
         </div>
@@ -367,10 +353,10 @@ export default function SearchForm({ onResults, onLoading }) {
       <div className="flex gap-3 items-end">
         <button
           onClick={() => handleSearch(false)}
-          disabled={loading || !criteria.location}
+          disabled={!criteria.location}
           className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
         >
-          {loading ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
+          <Search size={18} />
           Search
         </button>
         <div className="flex gap-2 items-end">
@@ -383,7 +369,7 @@ export default function SearchForm({ onResults, onLoading }) {
           />
           <button
             onClick={() => handleSearch(true)}
-            disabled={loading || !criteria.location || !saveName}
+            disabled={!criteria.location || !saveName}
             className="px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm font-medium whitespace-nowrap"
           >
             Save & Search

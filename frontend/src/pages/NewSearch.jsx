@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import SearchForm from '../components/SearchForm'
 import PropertyCard from '../components/PropertyCard'
 import { Loader2 } from 'lucide-react'
+import { streamSearch } from '../api'
 
 export default function NewSearch() {
   const navigate = useNavigate()
@@ -10,12 +11,33 @@ export default function NewSearch() {
   const [loading, setLoading] = useState(false)
   const [sortBy, setSortBy] = useState('price_asc')
   const [providerErrors, setProviderErrors] = useState([])
+  const [progress, setProgress] = useState(null) // { current, total, location }
 
-  const handleResults = (data) => {
-    setResults(data)
-    setProviderErrors(data.provider_errors || [])
-    if (data.search_id) {
-      // Was saved - could navigate to results page
+  const handleSearch = async (criteria, saveName) => {
+    setLoading(true)
+    setResults(null)
+    setProgress(null)
+    setProviderErrors([])
+
+    try {
+      await streamSearch(criteria, {
+        onProgress: (msg) => setProgress(msg),
+        onResults: (msg) => {
+          setResults(msg)
+          setProviderErrors(msg.provider_errors || [])
+          setProgress(null)
+          setLoading(false)
+        },
+        onError: (err) => {
+          console.error('Stream error:', err)
+          setLoading(false)
+          setProgress(null)
+        },
+      })
+    } catch (e) {
+      console.error('Search failed:', e)
+      setLoading(false)
+      setProgress(null)
     }
   }
 
@@ -35,12 +57,30 @@ export default function NewSearch() {
     <div>
       <h1 className="text-2xl font-bold text-slate-800 mb-6">New Search</h1>
 
-      <SearchForm onResults={handleResults} onLoading={setLoading} />
+      <SearchForm onSearch={handleSearch} onLoading={setLoading} />
 
       {loading && (
-        <div className="flex items-center justify-center gap-3 py-12 text-brand-600">
-          <Loader2 size={24} className="animate-spin" />
-          <span className="text-lg">Searching across all platforms...</span>
+        <div className="py-8">
+          {progress ? (
+            <div className="max-w-lg mx-auto">
+              <div className="flex justify-between text-sm text-slate-600 mb-2">
+                <span>Searching ZIP {progress.current}/{progress.total}</span>
+                <span>{Math.round((progress.current / progress.total) * 100)}%</span>
+              </div>
+              <div className="w-full bg-slate-200 rounded-full h-3">
+                <div
+                  className="bg-blue-600 h-3 rounded-full transition-all duration-300"
+                  style={{ width: `${(progress.current / progress.total) * 100}%` }}
+                />
+              </div>
+              <p className="text-xs text-slate-500 mt-2 text-center">{progress.location}</p>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center gap-3 text-brand-600">
+              <Loader2 size={24} className="animate-spin" />
+              <span className="text-lg">Starting search...</span>
+            </div>
+          )}
         </div>
       )}
 

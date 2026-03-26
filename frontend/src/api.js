@@ -36,3 +36,36 @@ export const api = {
   generateReport: () => request('/report/generate', { method: 'POST' }),
   sendReport: () => request('/report/send', { method: 'POST' }),
 }
+
+export async function streamSearch(criteria, { onProgress, onResults, onError } = {}) {
+  const res = await fetch(`${BASE}/search/stream`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ criteria }),
+  })
+  if (!res.ok) throw new Error(`API error: ${res.status}`)
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+
+    const lines = buffer.split('\n')
+    buffer = lines.pop() // keep incomplete line in buffer
+
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue
+      try {
+        const msg = JSON.parse(line.slice(6))
+        if (msg.type === 'progress') onProgress?.(msg)
+        else if (msg.type === 'results') onResults?.(msg)
+      } catch (e) {
+        // skip malformed lines
+      }
+    }
+  }
+}

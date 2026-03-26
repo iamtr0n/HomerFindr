@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Polish & Verification
 status: unknown
-stopped_at: 260326-erx quick task complete — commits 1d95a19, 3d76a01
-last_updated: "2026-03-26T14:46:00.000Z"
+stopped_at: 260326-ery quick task complete — commits 91572bc (backend), 09b89f5 (frontend)
+last_updated: "2026-03-26T14:50:54Z"
 progress:
   total_phases: 3
   completed_phases: 1
@@ -81,10 +81,11 @@ None yet.
 | 260326-dio | Add fireplace/AC/heat/pool filters, Coming Soon, ZIP fix, real-time alerts | 2026-03-26 | 241649b | [260326-dio-add-new-filters-fireplace-ac-heat-pool-f](./quick/260326-dio-add-new-filters-fireplace-ac-heat-pool-f/) |
 | 260326-ejq | SSE streaming endpoint + live progress bar + simplified search flow | 2026-03-26 | c113300 | [260326-ejq-fix-web-search-sse-streaming-endpoint-li](./quick/260326-ejq-fix-web-search-sse-streaming-endpoint-li/) |
 | 260326-erx | Location typeahead autocomplete + state-aware zip disambiguation | 2026-03-26 | 3d76a01 | [260326-erx-location-autocomplete-state-aware-disamb](./quick/260326-erx-location-autocomplete-state-aware-disamb/) |
+| 260326-ery | Per-search Zapier webhook notifications + Dashboard alerts panel | 2026-03-26 | 09b89f5 | [260326-ery-zapier-webhook-sms-notifications-per-sea](./quick/260326-ery-zapier-webhook-sms-notifications-per-sea/) |
 
 ## Session Continuity
 
-Last activity: 2026-03-26 - Completed quick task 260326-erx: Location typeahead autocomplete + state-aware zip disambiguation
-Last session: 2026-03-26T14:46:00.000Z
-Stopped at: 260326-erx quick task complete — commits 1d95a19 (backend), 3d76a01 (frontend)
+Last activity: 2026-03-26 - Completed quick task 260326-ery: Per-search Zapier webhook notifications + Dashboard alerts panel
+Last session: 2026-03-26T14:50:54Z
+Stopped at: 260326-ery quick task complete — commits 91572bc (backend), 09b89f5 (frontend)
 Resume file: None

@@ -156,12 +156,21 @@ def display_results(results: list[Listing], criteria: SearchCriteria, pre_filter
         for i, l in enumerate(page, offset + 1):
             star = "⭐" if l.is_gold_star else ("★ " if l.is_starred else "  ")
             price = f"${l.price:,.0f}" if l.price else "N/A"
+            ppsf = f"(${round(l.price / l.sqft):,}/sf)" if l.price and l.sqft else ""
             beds = str(l.bedrooms or "?")
             baths = str(l.bathrooms or "?")
             sqft = f"{l.sqft:,}sqft" if l.sqft else ""
-            addr = l.address[:45] + ("…" if len(l.address) > 45 else "")
+            addr = l.address[:40] + ("…" if len(l.address) > 40 else "")
             score = f"[{l.match_score}/{max_score}]" if max_score > 0 else ""
-            label = f"{star}  {price:>10}  {beds}bd/{baths}ba  {sqft:<10}  {addr}  {score}"
+            dom = ""
+            if l.days_on_mls is not None:
+                if l.days_on_mls < 7:
+                    dom = " 🟢New"
+                elif l.days_on_mls > 60:
+                    dom = f" 🔴{l.days_on_mls}d"
+                elif l.days_on_mls >= 31:
+                    dom = f" 🟡{l.days_on_mls}d"
+            label = f"{star}  {price:>10} {ppsf:<12}  {beds}bd/{baths}ba  {sqft:<10}  {addr}  {score}{dom}"
             choices.append(questionary.Choice(title=label, value=i - 1))
 
         # Navigation options
@@ -214,7 +223,22 @@ def _show_detail_card(listing: Listing, max_score: int) -> str:
             table.add_row(field, str(value))
 
     price_str = f"${listing.price:,.0f}" if listing.price else "—"
+    if listing.price and listing.sqft:
+        ppsf = round(listing.price / listing.sqft)
+        price_str += f"  [dim](${ppsf:,}/sqft)[/dim]"
     row("Price", price_str)
+
+    # DOM indicator
+    if listing.days_on_mls is not None:
+        dom = listing.days_on_mls
+        if dom < 7:
+            row("Days on Market", f"[bold green]{dom} days — New listing[/bold green]")
+        elif dom >= 31 and dom <= 60:
+            row("Days on Market", f"[yellow]{dom} days[/yellow]")
+        elif dom > 60:
+            row("Days on Market", f"[bold red]{dom} days — may be negotiable[/bold red]")
+        else:
+            row("Days on Market", f"{dom} days")
 
     city_state = ", ".join(filter(None, [listing.city, listing.state, listing.zip_code]))
     row("Location", city_state or None)

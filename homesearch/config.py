@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     # Optional paid API keys
     rapidapi_key: str = ""
 
+    # Global Zapier webhook — fires for all saved searches that don't override it
+    zapier_webhook_url: str = ""
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 

@@ -69,8 +69,9 @@ def start_scheduler():
 
             print(f"[Alerts] {count} new listing(s) for '{s.name}'")
 
-            # Zapier webhook dispatch
-            if ns.zapier_webhook:
+            # Zapier webhook dispatch — per-search URL takes precedence, falls back to global
+            webhook_url = ns.zapier_webhook or settings.zapier_webhook_url
+            if webhook_url:
                 import httpx
                 try:
                     payload = {
@@ -93,7 +94,7 @@ def start_scheduler():
                             for l in new_listings[:10]  # Cap at 10 to avoid huge payloads
                         ],
                     }
-                    httpx.post(ns.zapier_webhook, json=payload, timeout=10)
+                    httpx.post(webhook_url, json=payload, timeout=10)
                     print(f"[Alerts] Webhook sent for '{s.name}' ({count} listings)")
                 except Exception as e:
                     print(f"[Alerts] Webhook error for '{s.name}': {e}")
@@ -102,25 +103,27 @@ def start_scheduler():
             print(f"[Alerts] Error checking '{s.name}': {e}")
 
     def alert_job():
-        """Check active saved searches WITHOUT a webhook (10-min poll)."""
+        """Check active saved searches that have no webhook (desktop-only, 10-min poll)."""
         from homesearch import database as db
 
         active_searches = db.get_saved_searches(active_only=True)
         if not active_searches:
             return
+        global_webhook = settings.zapier_webhook_url
         for s in active_searches:
-            if not s.notification_settings.zapier_webhook:
+            if not s.notification_settings.zapier_webhook and not global_webhook:
                 _check_search(s)
 
     def webhook_alert_job():
-        """Check active saved searches WITH a webhook configured (3-min poll)."""
+        """Check active saved searches that have a webhook (per-search or global, 3-min poll)."""
         from homesearch import database as db
 
         active_searches = db.get_saved_searches(active_only=True)
         if not active_searches:
             return
+        global_webhook = settings.zapier_webhook_url
         for s in active_searches:
-            if s.notification_settings.zapier_webhook:
+            if s.notification_settings.zapier_webhook or global_webhook:
                 _check_search(s)
 
     _scheduler = BackgroundScheduler()

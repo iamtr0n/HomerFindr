@@ -35,29 +35,18 @@ def main(ctx: typer.Context):
 def search():
     """Interactive search wizard - find properties with detailed filters."""
     from homesearch.tui.wizard import run_search_wizard
-    from homesearch.services.search_service import run_search
-
-    criteria = run_search_wizard()
-    if criteria is None:
-        return
+    from homesearch.tui.results import execute_search_with_spinner, display_results
 
     db.init_db()
-    save_it = questionary.confirm("Save this search for daily alerts?", default=True).ask()
-    search_id = None
-    if save_it:
-        name = questionary.text("Name this search:").ask()
-        if name:
-            try:
-                search_id = db.save_search(SavedSearch(name=name.strip(), criteria=criteria))
-                console.print(f"[green]Saved as '{name}'[/green]")
-            except Exception as e:
-                console.print(f"[red]Could not save: {e}[/red]")
+    while True:
+        criteria = run_search_wizard()
+        if criteria is None:
+            return
 
-    console.print("\n")
-    with console.status("[bold blue]🔍 Searching across all platforms...[/bold blue]"):
-        results = run_search(criteria, search_id=search_id, use_zip_discovery=False)
-
-    _display_results(results)
+        results, pre_filter_count = execute_search_with_spinner(criteria)
+        new_search = display_results(results, criteria, pre_filter_count)
+        if not new_search:
+            return
 
 
 def search_interactive():

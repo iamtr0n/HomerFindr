@@ -12,6 +12,12 @@ class RedfinProvider(BaseProvider):
     def name(self) -> str:
         return "redfin"
 
+    @property
+    def enabled(self) -> bool:
+        # Redfin's stingray API returns 403 for all automated access as of 2026.
+        # Disabled to avoid wasted search time and terminal output corruption.
+        return False
+
     def search(self, criteria: SearchCriteria, on_progress=None) -> list[Listing]:
         try:
             from redfin import Redfin

@@ -4,12 +4,34 @@ import { Card, CardContent } from './ui/Card'
 import { Badge } from './ui/Badge'
 import { Button } from './ui/Button'
 
+const LISTING_TYPE_STYLES = {
+  sale: { label: 'For Sale', cls: 'bg-green-100 text-green-800 border-green-300' },
+  pending: { label: 'Pending', cls: 'bg-amber-100 text-amber-800 border-amber-300' },
+  coming_soon: { label: 'Coming Soon', cls: 'bg-blue-100 text-blue-800 border-blue-300' },
+  rent: { label: 'For Rent', cls: 'bg-purple-100 text-purple-800 border-purple-300' },
+  sold: { label: 'Sold', cls: 'bg-gray-100 text-gray-600 border-gray-300' },
+}
+
+function DomBadge({ days }) {
+  if (days == null) return null
+  if (days < 7) return (
+    <span className="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-700 border border-green-300 font-medium">New</span>
+  )
+  if (days >= 31 && days <= 60) return (
+    <span className="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-700 border border-amber-300">{days} days</span>
+  )
+  if (days > 60) return (
+    <span className="px-2 py-0.5 text-xs rounded-full bg-red-100 text-red-700 border border-red-300">{days} days</span>
+  )
+  return null
+}
+
 export default function PropertyCard({ listing, isGoldStar = false }) {
   const {
     address, city, state, price, bedrooms, bathrooms, sqft, year_built,
     has_garage, has_basement, stories, hoa_monthly, photo_url, source_url,
     source, zip_code, property_type, match_badges, near_highway, highway_name,
-    school_rating, school_district,
+    school_rating, school_district, listing_type, match_score, days_on_mls,
   } = listing
 
   const [imgLoaded, setImgLoaded] = useState(false)
@@ -52,6 +74,12 @@ export default function PropertyCard({ listing, isGoldStar = false }) {
           <Home size={28} />
           <span className="text-xs">No Photo Available</span>
         </div>
+        {/* Listing type badge — bottom-left of image */}
+        {listing_type && LISTING_TYPE_STYLES[listing_type] && (
+          <span className={`absolute bottom-2 left-2 px-2 py-0.5 text-xs rounded-full border font-medium shadow-sm ${LISTING_TYPE_STYLES[listing_type].cls}`}>
+            {LISTING_TYPE_STYLES[listing_type].label}
+          </span>
+        )}
         {isGoldStar && (
           <Badge className="absolute top-2 left-2 bg-amber-400 text-amber-900 shadow-sm">
             &#11088; Perfect Match
@@ -63,11 +91,19 @@ export default function PropertyCard({ listing, isGoldStar = false }) {
       </a>
 
       <CardContent className="p-4">
-        {/* Price */}
-        <p className="text-2xl font-bold text-slate-900 mb-1">{priceStr}</p>
+        {/* Price + score chip */}
+        <div className="flex items-baseline gap-2 mb-1">
+          <p className="text-2xl font-bold text-slate-900">{priceStr}</p>
+          {match_score != null && match_score > 0 && (
+            <span className="px-2 py-0.5 text-xs rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-medium">
+              {match_score} match
+            </span>
+          )}
+          <DomBadge days={days_on_mls} />
+        </div>
 
         {/* Stats row */}
-        <div className="flex items-center gap-3 text-sm text-slate-600 mb-2">
+        <div className="flex items-center gap-3 text-sm text-slate-600 mb-2 flex-wrap">
           {bedrooms != null && (
             <span className="flex items-center gap-1"><Bed size={14} /> {bedrooms} bd</span>
           )}
@@ -76,6 +112,9 @@ export default function PropertyCard({ listing, isGoldStar = false }) {
           )}
           {sqft != null && (
             <span className="flex items-center gap-1"><Ruler size={14} /> {sqft.toLocaleString()} sqft</span>
+          )}
+          {price != null && sqft != null && sqft > 0 && (
+            <span className="text-slate-400">${Math.round(price / sqft).toLocaleString()}/sqft</span>
           )}
           {year_built != null && (
             <span className="flex items-center gap-1"><Calendar size={14} /> {year_built}</span>

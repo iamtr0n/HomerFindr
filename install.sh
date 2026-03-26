@@ -2,13 +2,13 @@
 # HomerFindr — one-command installer
 # Usage: curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/HomerFindr/main/install.sh | bash
 
-set -e
-
 REPO="https://github.com/iamtr0n/HomerFindr.git"
 INSTALL_DIR="$HOME/HomerFindr"
 PLIST="$HOME/Library/LaunchAgents/com.homerfindr.plist"
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
+YELLOW='\033[0;33m'
+RED='\033[0;31m'
 NC='\033[0m'
 
 echo ""
@@ -16,19 +16,100 @@ echo "  🏠  HomerFindr Installer"
 echo "  ─────────────────────────────"
 echo ""
 
+# ── Dependency checker + auto-installer ──────────────────────────────────────
+
+check_and_install_homebrew() {
+  if ! command -v brew &>/dev/null; then
+    echo -e "  ${YELLOW}Homebrew not found — installing it first (needed for Python/Node)...${NC}"
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    # Add brew to PATH for this session (Apple Silicon vs Intel)
+    if [ -f /opt/homebrew/bin/brew ]; then
+      eval "$(/opt/homebrew/bin/brew shellenv)"
+    elif [ -f /usr/local/bin/brew ]; then
+      eval "$(/usr/local/bin/brew shellenv)"
+    fi
+    echo -e "  ${GREEN}✓ Homebrew installed${NC}"
+  fi
+}
+
 # 1. Check Python 3.11+
-if ! command -v python3 &>/dev/null; then
-  echo "Python 3.11+ is required. Install from https://www.python.org/downloads/" && exit 1
-fi
-PY_VER=$(python3 -c 'import sys; print(sys.version_info >= (3,11))')
-if [ "$PY_VER" != "True" ]; then
-  echo "Python 3.11+ required (you have $(python3 --version)). Install from https://www.python.org/downloads/" && exit 1
+echo "  Checking Python..."
+PYTHON_OK=false
+for cmd in python3.13 python3.12 python3.11 python3; do
+  if command -v "$cmd" &>/dev/null; then
+    VER_OK=$("$cmd" -c 'import sys; print(sys.version_info >= (3,11))' 2>/dev/null)
+    if [ "$VER_OK" = "True" ]; then
+      PYTHON_BIN="$cmd"
+      PYTHON_OK=true
+      echo -e "  ${GREEN}✓ Python $("$cmd" --version 2>&1 | awk '{print $2}') found${NC}"
+      break
+    fi
+  fi
+done
+
+if [ "$PYTHON_OK" = "false" ]; then
+  FOUND_VER=$(python3 --version 2>&1 || echo "not installed")
+  echo -e "  ${RED}✗ Python 3.11+ required — found: $FOUND_VER${NC}"
+  echo ""
+  read -p "  Install Python 3.11 automatically via Homebrew? (y/n): " INSTALL_PY
+  if [[ "$INSTALL_PY" =~ ^[Yy]$ ]]; then
+    check_and_install_homebrew
+    echo "  Installing Python 3.11..."
+    brew install python@3.11
+    eval "$(brew --prefix python@3.11)/bin/python3.11 --version"
+    PYTHON_BIN="$(brew --prefix python@3.11)/bin/python3.11"
+    echo -e "  ${GREEN}✓ Python 3.11 installed${NC}"
+  else
+    echo ""
+    echo "  Please install Python 3.11+ manually:"
+    echo "  ➜ https://www.python.org/downloads/"
+    echo "  Then re-run this installer."
+    exit 1
+  fi
 fi
 
 # 2. Check Node.js
-if ! command -v node &>/dev/null; then
-  echo "Node.js is required for the web dashboard. Install from https://nodejs.org" && exit 1
+echo "  Checking Node.js..."
+if command -v node &>/dev/null; then
+  echo -e "  ${GREEN}✓ Node.js $(node --version) found${NC}"
+else
+  echo -e "  ${RED}✗ Node.js not found${NC}"
+  echo ""
+  read -p "  Install Node.js automatically via Homebrew? (y/n): " INSTALL_NODE
+  if [[ "$INSTALL_NODE" =~ ^[Yy]$ ]]; then
+    check_and_install_homebrew
+    echo "  Installing Node.js..."
+    brew install node
+    echo -e "  ${GREEN}✓ Node.js $(node --version) installed${NC}"
+  else
+    echo ""
+    echo "  Please install Node.js manually:"
+    echo "  ➜ https://nodejs.org/en/download/"
+    echo "  Then re-run this installer."
+    exit 1
+  fi
 fi
+
+# 3. Check git
+echo "  Checking Git..."
+if command -v git &>/dev/null; then
+  echo -e "  ${GREEN}✓ Git $(git --version | awk '{print $3}') found${NC}"
+else
+  echo -e "  ${RED}✗ Git not found${NC}"
+  read -p "  Install Git via Homebrew? (y/n): " INSTALL_GIT
+  if [[ "$INSTALL_GIT" =~ ^[Yy]$ ]]; then
+    check_and_install_homebrew
+    brew install git
+    echo -e "  ${GREEN}✓ Git installed${NC}"
+  else
+    echo "  Install Git from https://git-scm.com/downloads then re-run." && exit 1
+  fi
+fi
+
+echo ""
+echo "  All dependencies satisfied — installing HomerFindr..."
+echo ""
+set -e
 
 # 3. Clone or update
 if [ -d "$INSTALL_DIR/.git" ]; then
@@ -43,7 +124,7 @@ cd "$INSTALL_DIR"
 
 # 4. Python venv + install
 echo "Installing Python dependencies..."
-python3 -m venv .venv --quiet
+"$PYTHON_BIN" -m venv .venv --quiet
 .venv/bin/pip install -e . --quiet
 
 # 5. Build frontend

@@ -50,7 +50,7 @@ class HomeHarvestProvider(BaseProvider):
 
         for progress_idx, location in enumerate(locations, start=1):
             if on_progress:
-                on_progress(progress_idx, total, location)
+                on_progress(progress_idx, total, location, len(all_listings))
             try:
                 time.sleep(1.5)  # Rate limiting - be respectful
                 df = homeharvest.scrape_property(

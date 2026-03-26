@@ -43,6 +43,7 @@ def run_search(
     use_zip_discovery: bool = True,
     errors: Optional[list] = None,
     pre_filter_counts: Optional[list] = None,
+    raw_listings_out: Optional[list] = None,
     on_progress=None,
 ) -> list[Listing]:
     """Execute a search across all providers, dedupe, filter, and return results.
@@ -60,9 +61,14 @@ def run_search(
     providers = get_providers()
     all_listings: list[Listing] = []
 
+    # Wrap on_progress to inject running found count
+    def _wrapped_progress(current, total, location, found=0):
+        if on_progress:
+            on_progress(current, total, location, found)
+
     for provider in providers:
         try:
-            results = provider.search(criteria, on_progress=on_progress)
+            results = provider.search(criteria, on_progress=_wrapped_progress)
             all_listings.extend(results)
         except Exception as e:
             msg = f"{provider.name}: {e}"
@@ -87,6 +93,8 @@ def run_search(
     # Record pre-filter count for caller diagnostics
     if pre_filter_counts is not None:
         pre_filter_counts.append(len(deduped))
+    if raw_listings_out is not None:
+        raw_listings_out.extend(deduped)
 
     # Note: school enrichment would go here if a school API were available.
     # Currently school_rating is extracted at the provider level from row data.

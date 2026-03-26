@@ -23,19 +23,21 @@ from homesearch.tui.styles import (
 )
 
 
-def execute_search_with_spinner(criteria: SearchCriteria) -> tuple[list[Listing], int]:
+def execute_search_with_spinner(criteria: SearchCriteria) -> tuple[list[Listing], int, list[Listing]]:
     """Run search in background thread with live ZIP progress bar."""
     results: list[Listing] = []
     error: list[Exception] = []
     pre_filter_counts: list[int] = []
+    raw_listings_out: list[Listing] = []
     done_event = threading.Event()
 
-    progress: dict = {"current": 0, "total": 0, "location": ""}
+    progress: dict = {"current": 0, "total": 0, "location": "", "found": 0}
 
-    def _on_progress(current: int, total: int, location: str) -> None:
+    def _on_progress(current: int, total: int, location: str, found: int = 0) -> None:
         progress["current"] = current
         progress["total"] = total
         progress["location"] = location
+        progress["found"] = found
 
     def _search_worker():
         try:
@@ -43,6 +45,7 @@ def execute_search_with_spinner(criteria: SearchCriteria) -> tuple[list[Listing]
                 criteria,
                 use_zip_discovery=True,
                 pre_filter_counts=pre_filter_counts,
+                raw_listings_out=raw_listings_out,
                 on_progress=_on_progress,
             )
             results.extend(found)
@@ -62,21 +65,23 @@ def execute_search_with_spinner(criteria: SearchCriteria) -> tuple[list[Listing]
         while not done_event.is_set():
             cur = progress["current"]
             tot = progress["total"]
+            found = progress["found"]
             spin = spinners[spin_idx % len(spinners)]
             spin_idx += 1
 
+            found_str = f"  ·  {found} found" if found > 0 else ""
             if tot > 0:
                 filled = int(bar_width * cur / tot)
                 bar = "█" * filled + "░" * (bar_width - filled)
                 pct = int(100 * cur / tot)
                 live.update(
                     Text(
-                        f"{spin}  🏠  Searching ZIP {cur}/{tot}  [{bar}] {pct}%",
+                        f"{spin}  🏠  Searching ZIP {cur}/{tot}  [{bar}] {pct}%{found_str}",
                         style="bold cyan",
                     )
                 )
             else:
-                live.update(Text(f"{spin}  🏠  Discovering search area...", style="bold cyan"))
+                live.update(Text(f"{spin}  🏠  Discovering search area...{found_str}", style="bold cyan"))
 
             done_event.wait(timeout=0.125)
 
@@ -86,13 +91,13 @@ def execute_search_with_spinner(criteria: SearchCriteria) -> tuple[list[Listing]
         console.print(f"[yellow]Warning: search encountered an error — {error[0]}[/yellow]")
 
     pre_filter_count = pre_filter_counts[0] if pre_filter_counts else 0
-    return results, pre_filter_count
+    return results, pre_filter_count, raw_listings_out
 
 
-def display_results(results: list[Listing], criteria: SearchCriteria, pre_filter_count: int = 0) -> bool:
+def display_results(results: list[Listing], criteria: SearchCriteria, pre_filter_count: int = 0, raw_listings: list[Listing] | None = None) -> bool:
     """Interactive results browser. Returns True if user wants a new search."""
     if not results:
-        _show_no_results(criteria, pre_filter_count)
+        _show_no_results(criteria, pre_filter_count, raw_listings)
         return _ask_new_search()
 
     providers = set(r.source for r in results)
@@ -243,26 +248,119 @@ def _ask_new_search() -> bool:
     return pick and "New search" in pick
 
 
-def _show_no_results(criteria: SearchCriteria, pre_filter_count: int) -> None:
+def _diagnose_filters(raw: list[Listing], criteria: SearchCriteria) -> list[tuple[str, int]]:
+    """For each active filter, count how many raw listings it eliminates. Returns sorted list."""
+    total = len(raw)
+    if not total:
+        return []
+
+    hits: list[tuple[str, int]] = []
+
+    def _elim(pred) -> int:
+        return sum(1 for l in raw if pred(l))
+
+    if criteria.price_min is not None:
+        n = _elim(lambda l: l.price is not None and l.price < criteria.price_min)
+        if n:
+            hits.append((f"Price min ${criteria.price_min:,.0f}", n))
+
+    if criteria.price_max is not None:
+        n = _elim(lambda l: l.price is not None and l.price > criteria.price_max)
+        if n:
+            hits.append((f"Price max ${criteria.price_max:,.0f}", n))
+
+    if criteria.bedrooms_min:
+        n = _elim(lambda l: l.bedrooms is not None and l.bedrooms < criteria.bedrooms_min)
+        if n:
+            hits.append((f"Beds ≥ {criteria.bedrooms_min}", n))
+
+    if criteria.bathrooms_min:
+        n = _elim(lambda l: l.bathrooms is not None and l.bathrooms < criteria.bathrooms_min)
+        if n:
+            hits.append((f"Baths ≥ {criteria.bathrooms_min}", n))
+
+    if criteria.sqft_min:
+        n = _elim(lambda l: l.sqft is not None and l.sqft < criteria.sqft_min)
+        if n:
+            hits.append((f"Sqft ≥ {criteria.sqft_min:,}", n))
+
+    if criteria.sqft_max:
+        n = _elim(lambda l: l.sqft is not None and l.sqft > criteria.sqft_max)
+        if n:
+            hits.append((f"Sqft ≤ {criteria.sqft_max:,}", n))
+
+    if criteria.lot_sqft_min:
+        n = _elim(lambda l: l.lot_sqft is not None and l.lot_sqft < criteria.lot_sqft_min)
+        if n:
+            hits.append((f"Lot ≥ {criteria.lot_sqft_min:,} sqft", n))
+
+    if criteria.year_built_min:
+        n = _elim(lambda l: l.year_built is not None and l.year_built < criteria.year_built_min)
+        if n:
+            hits.append((f"Built ≥ {criteria.year_built_min}", n))
+
+    if criteria.has_basement is True:
+        n = _elim(lambda l: l.has_basement is False)
+        if n:
+            hits.append(("Has basement", n))
+
+    if criteria.has_garage is True:
+        n = _elim(lambda l: l.has_garage is False)
+        if n:
+            hits.append(("Has garage", n))
+
+    if criteria.has_fireplace is True:
+        n = _elim(lambda l: l.has_fireplace is not True)
+        if n:
+            hits.append(("Has fireplace", n))
+
+    if criteria.has_pool is True:
+        n = _elim(lambda l: l.has_pool is not True)
+        if n:
+            hits.append(("Has pool", n))
+
+    if criteria.has_ac is True:
+        n = _elim(lambda l: l.has_ac is not True)
+        if n:
+            hits.append(("Has A/C", n))
+
+    if criteria.hoa_max is not None:
+        n = _elim(lambda l: l.hoa_monthly is not None and l.hoa_monthly > criteria.hoa_max)
+        if n:
+            hits.append((f"HOA ≤ ${criteria.hoa_max:.0f}/mo", n))
+
+    if criteria.property_types:
+        pt_vals = [pt.value for pt in criteria.property_types]
+        n = _elim(lambda l: l.property_type not in pt_vals)
+        if n:
+            hits.append(("Property type", n))
+
+    if criteria.house_styles:
+        n = _elim(lambda l: l.house_style is not None and not any(s in l.house_style for s in criteria.house_styles))
+        if n:
+            hits.append(("House style", n))
+
+    hits.sort(key=lambda x: -x[1])
+    return hits
+
+
+def _show_no_results(criteria: SearchCriteria, pre_filter_count: int, raw_listings: list[Listing] | None = None) -> None:
     if pre_filter_count > 0:
         console.print(
-            f"[yellow]No properties matched your filters "
-            f"({pre_filter_count} listing{'s' if pre_filter_count != 1 else ''} found before filtering).[/yellow]"
+            f"\n[yellow]Found {pre_filter_count} listing{'s' if pre_filter_count != 1 else ''} "
+            f"but none passed your filters.[/yellow]"
         )
-        console.print("[dim]Active filters that may be too restrictive:[/dim]")
-        if criteria.price_min is not None or criteria.price_max is not None:
-            lo = f"${criteria.price_min:,}" if criteria.price_min is not None else "any"
-            hi = f"${criteria.price_max:,}" if criteria.price_max is not None else "any"
-            console.print(f"  [cyan]Price:[/cyan] {lo} – {hi}")
-        if criteria.bedrooms_min is not None:
-            console.print(f"  [cyan]Bedrooms:[/cyan] {criteria.bedrooms_min}+")
-        if criteria.bathrooms_min is not None:
-            console.print(f"  [cyan]Bathrooms:[/cyan] {criteria.bathrooms_min}+")
-        if criteria.sqft_min is not None or criteria.sqft_max is not None:
-            lo = f"{criteria.sqft_min:,}" if criteria.sqft_min is not None else "any"
-            hi = f"{criteria.sqft_max:,}" if criteria.sqft_max is not None else "any"
-            console.print(f"  [cyan]Sq ft:[/cyan] {lo} – {hi}")
-        console.print("[dim]Try running the search again with broader criteria.[/dim]")
+        if raw_listings:
+            diagnosis = _diagnose_filters(raw_listings, criteria)
+            if diagnosis:
+                console.print("[bold]Filters eliminating the most listings:[/bold]")
+                bar_w = 20
+                for label, count in diagnosis[:6]:
+                    pct = int(100 * count / pre_filter_count)
+                    filled = max(1, pct * bar_w // 100) if pct > 0 else 0
+                    bar = "█" * filled + "░" * (bar_w - filled)
+                    console.print(f"  [cyan]{label:<22}[/cyan]  [{bar}] {count}/{pre_filter_count} eliminated")
+        console.print("[dim]\nTry relaxing the filters shown above for more results.[/dim]")
     else:
         console.print("[yellow]No properties found matching your criteria.[/yellow]")
         console.print("[dim]Try a different location or broader search area.[/dim]")

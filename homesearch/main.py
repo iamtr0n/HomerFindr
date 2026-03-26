@@ -43,8 +43,8 @@ def search():
         if criteria is None:
             return
 
-        results, pre_filter_count = execute_search_with_spinner(criteria)
-        new_search = display_results(results, criteria, pre_filter_count)
+        results, pre_filter_count, raw_listings = execute_search_with_spinner(criteria)
+        new_search = display_results(results, criteria, pre_filter_count, raw_listings)
         if not new_search:
             return
 

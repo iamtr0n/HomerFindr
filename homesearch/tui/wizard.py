@@ -390,7 +390,13 @@ def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
                 console.print("[red]Location is required.[/red]")
                 continue
             all_locations.append(loc)
-            selected = show_zip_browser(loc, radius_miles)
+            # Ask radius per location in multi-area mode
+            r_answer = _s(f"Search radius for {loc}:", ["5 miles", "10 miles", "25 miles", "50 miles", "100 miles"])
+            if r_answer is None or r_answer == _BACK:
+                all_locations.pop()
+                continue
+            loc_radius = int(r_answer.split()[0])
+            selected = show_zip_browser(loc, loc_radius)
             if selected is None:
                 return _BACK
             all_zips.extend(selected)

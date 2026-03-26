@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from homesearch import database as db
-from homesearch.models import Listing, SavedSearch, SearchCriteria
+from homesearch.models import Listing, NotificationSettings, SavedSearch, SearchCriteria
 from homesearch.services.search_service import run_search
 from homesearch.services.zip_service import discover_zip_codes
 from homesearch.models import ZipInfo
@@ -263,6 +263,29 @@ def search_locations(q: str = ""):
             break
 
     return {"suggestions": suggestions}
+
+
+# --- Notification settings ---
+
+class NotificationSettingsRequest(BaseModel):
+    desktop: bool = True
+    zapier_webhook: str = ""
+    notify_coming_soon_only: bool = False
+
+
+@app.put("/api/searches/{search_id}/notifications")
+def update_notification_settings(search_id: int, req: NotificationSettingsRequest):
+    """Update notification settings for a saved search."""
+    existing = db.get_saved_search(search_id)
+    if not existing:
+        raise HTTPException(404, "Search not found")
+    ns = NotificationSettings(
+        desktop=req.desktop,
+        zapier_webhook=req.zapier_webhook,
+        notify_coming_soon_only=req.notify_coming_soon_only,
+    )
+    db.update_search(search_id, notification_settings=ns)
+    return {"status": "updated", "notification_settings": ns.model_dump()}
 
 
 # --- Serve frontend static files ---

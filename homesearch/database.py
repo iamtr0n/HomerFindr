@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 from homesearch.config import settings
-from homesearch.models import Listing, SavedSearch, SearchCriteria
+from homesearch.models import Listing, NotificationSettings, SavedSearch, SearchCriteria
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS saved_searches (
@@ -94,6 +94,12 @@ def init_db():
             conn.commit()
         except Exception:
             pass  # Column already exists
+    # Add notification_settings_json column to saved_searches
+    try:
+        conn.execute("ALTER TABLE saved_searches ADD COLUMN notification_settings_json TEXT DEFAULT '{}'")
+        conn.commit()
+    except Exception:
+        pass  # Column already exists
     conn.close()
 
 
@@ -138,6 +144,9 @@ def get_saved_searches(active_only: bool = False) -> list[SavedSearch]:
                 last_run_at=datetime.fromisoformat(row["last_run_at"]) if row["last_run_at"] else None,
                 is_active=bool(row["is_active"]),
                 result_count=row["result_count"],
+                notification_settings=NotificationSettings.model_validate_json(
+                    row["notification_settings_json"] or "{}"
+                ),
             ))
         return results
     finally:
@@ -170,6 +179,9 @@ def get_saved_search(search_id: int) -> Optional[SavedSearch]:
             last_run_at=datetime.fromisoformat(row["last_run_at"]) if row["last_run_at"] else None,
             is_active=bool(row["is_active"]),
             result_count=row["result_count"],
+            notification_settings=NotificationSettings.model_validate_json(
+                row["notification_settings_json"] or "{}"
+            ),
         )
     finally:
         conn.close()
@@ -201,6 +213,9 @@ def get_saved_search_by_name(name: str) -> Optional[SavedSearch]:
             last_run_at=datetime.fromisoformat(row["last_run_at"]) if row["last_run_at"] else None,
             is_active=bool(row["is_active"]),
             result_count=row["result_count"],
+            notification_settings=NotificationSettings.model_validate_json(
+                row["notification_settings_json"] or "{}"
+            ),
         )
     finally:
         conn.close()
@@ -218,6 +233,9 @@ def update_search(search_id: int, **kwargs):
             elif k == "is_active":
                 sets.append("is_active = ?")
                 vals.append(int(v))
+            elif k == "notification_settings":
+                sets.append("notification_settings_json = ?")
+                vals.append(v.model_dump_json() if hasattr(v, "model_dump_json") else json.dumps(v))
             else:
                 sets.append(f"{k} = ?")
                 vals.append(v)

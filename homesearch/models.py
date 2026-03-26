@@ -101,6 +101,14 @@ class Listing(BaseModel):
     last_seen_at: Optional[datetime] = None
 
 
+class NotificationSettings(BaseModel):
+    """Per-search notification preferences."""
+
+    desktop: bool = True                    # macOS osascript notification
+    zapier_webhook: str = ""                # Zapier webhook URL (empty = disabled)
+    notify_coming_soon_only: bool = False   # Only alert on coming_soon listing_type
+
+
 class SavedSearch(BaseModel):
     """A persisted search profile."""
 
@@ -111,6 +119,7 @@ class SavedSearch(BaseModel):
     last_run_at: Optional[datetime] = None
     is_active: bool = True
     result_count: int = 0
+    notification_settings: NotificationSettings = Field(default_factory=NotificationSettings)
 
 
 class ZipInfo(BaseModel):

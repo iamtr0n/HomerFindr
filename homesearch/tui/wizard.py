@@ -389,6 +389,9 @@ def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
             if not loc:
                 console.print("[red]Location is required.[/red]")
                 continue
+            if loc.lower() in [l.lower() for l in all_locations]:
+                console.print(f"[yellow]{loc} is already in your list — skipping.[/yellow]")
+                continue
             all_locations.append(loc)
             # Ask radius per location in multi-area mode
             r_answer = _s(f"Search radius for {loc}:", ["5 miles", "10 miles", "25 miles", "50 miles", "100 miles"])

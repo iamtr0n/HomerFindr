@@ -1,12 +1,15 @@
 """FastAPI REST API for the web frontend."""
 
+import asyncio
+import json
+import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -57,6 +60,48 @@ def preview_search(req: SearchRequest):
     results = run_search(req.criteria, errors=provider_errors)
     return SearchResponse(results=results, total=len(results),
                           provider_errors=provider_errors)
+
+
+@app.post("/api/search/stream")
+async def stream_search(req: SearchRequest):
+    """Run a search with SSE progress streaming."""
+    loop = asyncio.get_event_loop()
+    queue: asyncio.Queue = asyncio.Queue()
+
+    def on_progress(current: int, total: int, location: str):
+        loop.call_soon_threadsafe(
+            queue.put_nowait,
+            {"type": "progress", "current": current, "total": total, "location": location}
+        )
+
+    def run_in_thread():
+        provider_errors: list[str] = []
+        results = run_search(req.criteria, errors=provider_errors, on_progress=on_progress)
+        loop.call_soon_threadsafe(
+            queue.put_nowait,
+            {
+                "type": "results",
+                "results": [r.model_dump() for r in results],
+                "total": len(results),
+                "provider_errors": provider_errors,
+            }
+        )
+
+    thread = threading.Thread(target=run_in_thread, daemon=True)
+    thread.start()
+
+    async def event_generator():
+        while True:
+            msg = await queue.get()
+            yield f"data: {json.dumps(msg)}\n\n"
+            if msg["type"] == "results":
+                break
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.post("/api/searches", response_model=SearchResponse)

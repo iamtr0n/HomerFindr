@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Polish & Verification
 status: unknown
-stopped_at: 260326-j1t quick task complete — commit 5dfa8d0
-last_updated: "2026-03-26T16:30:00Z"
+stopped_at: 260326-qyh quick task complete — commits 003b228, 5f34f9f, 0e6c5fa, ce831f7, fa85350
+last_updated: "2026-03-26T17:00:00Z"
 progress:
   total_phases: 3
   completed_phases: 1
@@ -86,6 +86,7 @@ None yet.
 | 260326-gam | Highway proximity detection + school ratings + sectioned results | 2026-03-26 | a21e071 | [260326-gam-highway-proximity-detection-school-ratin](./quick/260326-gam-highway-proximity-detection-school-ratin/) |
 | 260326-ghj | CLI multi-city ZIP search with spacebar multi-select browser | 2026-03-26 | 33b9014 | [260326-ghj-cli-multi-city-zip-search-tool-with-spac](./quick/260326-ghj-cli-multi-city-zip-search-tool-with-spac/) |
 | 260326-j1t | Fix Coming Soon InvalidListingType + batch listing types per location | 2026-03-26 | 5dfa8d0 | [260326-j1t-fix-coming-soon-invalidlistingtype-error](./quick/260326-j1t-fix-coming-soon-invalidlistingtype-error/) |
+| 260326-qyh | Listing type filter safety net + Pending multi-select + Best Match sort + PropertyCard enhancements + CLI price/sqft DOM | 2026-03-26 | fa85350 | [260326-qyh-smart-enhancements-listing-type-filter-w](./quick/260326-qyh-smart-enhancements-listing-type-filter-w/) |
 
 ## Session Continuity
 

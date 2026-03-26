@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Polish & Verification
 status: unknown
-stopped_at: 260326-gal quick task complete — commits 1d75334 (backend+CLI), 50281c7 (frontend)
-last_updated: "2026-03-26T15:50:46Z"
+stopped_at: 260326-j1t quick task complete — commit 5dfa8d0
+last_updated: "2026-03-26T16:30:00Z"
 progress:
   total_phases: 3
   completed_phases: 1
@@ -85,6 +85,7 @@ None yet.
 | 260326-gal | Scoring engine, match badges, gold star, CLI pagination, Best Match sort | 2026-03-26 | 50281c7 | [260326-gal-scoring-engine-match-badges-gold-star-so](./quick/260326-gal-scoring-engine-match-badges-gold-star-so/) |
 | 260326-gam | Highway proximity detection + school ratings + sectioned results | 2026-03-26 | a21e071 | [260326-gam-highway-proximity-detection-school-ratin](./quick/260326-gam-highway-proximity-detection-school-ratin/) |
 | 260326-ghj | CLI multi-city ZIP search with spacebar multi-select browser | 2026-03-26 | 33b9014 | [260326-ghj-cli-multi-city-zip-search-tool-with-spac](./quick/260326-ghj-cli-multi-city-zip-search-tool-with-spac/) |
+| 260326-j1t | Fix Coming Soon InvalidListingType + batch listing types per location | 2026-03-26 | 5dfa8d0 | [260326-j1t-fix-coming-soon-invalidlistingtype-error](./quick/260326-j1t-fix-coming-soon-invalidlistingtype-error/) |
 
 ## Session Continuity
 

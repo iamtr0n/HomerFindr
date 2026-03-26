@@ -99,17 +99,23 @@ def run_menu_loop():
 
 
 def _handle_new_search():
-    """Run the full search flow: wizard -> spinner -> results -> save."""
+    """Run the full search flow: wizard -> spinner -> results -> save.
+
+    Loops if the user selects 'New search' from the results screen.
+    """
     from homesearch.tui.wizard import run_search_wizard
     from homesearch.tui.results import execute_search_with_spinner, display_results
 
-    criteria = run_search_wizard()
-    if criteria is None:
-        console.print("[dim]Search cancelled.[/dim]")
-        return
+    while True:
+        criteria = run_search_wizard()
+        if criteria is None:
+            console.print("[dim]Search cancelled.[/dim]")
+            return
 
-    results, pre_filter_count, raw_listings = execute_search_with_spinner(criteria)
-    display_results(results, criteria, pre_filter_count=pre_filter_count, raw_listings=raw_listings)
+        results, pre_filter_count, raw_listings = execute_search_with_spinner(criteria)
+        want_new = display_results(results, criteria, pre_filter_count=pre_filter_count, raw_listings=raw_listings)
+        if not want_new:
+            return
 
 
 def _handle_saved_searches():

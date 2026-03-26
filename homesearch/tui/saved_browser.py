@@ -84,8 +84,12 @@ def _run_search_now(search) -> None:
 
     console.print(f"[cyan]Running: {search.name}[/cyan]")
     results, pre_filter_count, raw_listings = execute_search_with_spinner(search.criteria)
-    display_results(results, search.criteria, pre_filter_count=pre_filter_count, raw_listings=raw_listings)
+    want_new = display_results(results, search.criteria, pre_filter_count=pre_filter_count, raw_listings=raw_listings)
     db.update_search(search.id, last_run_at=datetime.now().isoformat())
+
+    if want_new:
+        from homesearch.tui.menu import _handle_new_search
+        _handle_new_search()
 
 
 def _toggle_active(search) -> None:

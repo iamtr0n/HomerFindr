@@ -40,7 +40,7 @@ def show_zip_browser(location: str, radius_miles: int) -> list[str] | None:
 
     if len(county_choices) > 1:
         selected_counties = checkbox(
-            "Select areas/counties to search (Space=toggle, Enter=confirm):",
+            "Select areas/counties to search (Space=toggle, Enter=confirm, Esc=back):",
             choices=county_choices,
             style=HOUSE_STYLE,
         ).ask()
@@ -73,7 +73,7 @@ def show_zip_browser(location: str, radius_miles: int) -> list[str] | None:
             choices.append(Choice(title=label, value=z.zipcode, checked=True))
 
     selected = checkbox(
-        "Select ZIP codes (Space=toggle, Enter=confirm):",
+        "Select ZIP codes (Space=toggle, Enter=confirm, Esc=back):",
         choices=choices,
         style=HOUSE_STYLE,
     ).ask()

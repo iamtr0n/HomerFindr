@@ -177,7 +177,7 @@ def display_results(results: list[Listing], criteria: SearchCriteria, pre_filter
         if offset + page_size < len(results):
             choices.append(questionary.Choice(title=f"   ↓  Load 50 more  ({len(results) - offset - page_size} remaining)", value="more"))
         choices.append(questionary.Choice(title="   ↩  New search", value="new_search"))
-        choices.append(questionary.Choice(title="   ✕  Exit", value="exit"))
+        choices.append(questionary.Choice(title="   ←  Back to main menu", value="exit"))
 
         pick = questionary.select(
             f"Select a listing to view details  ({len(results)} total):",

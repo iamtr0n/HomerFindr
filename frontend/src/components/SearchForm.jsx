@@ -4,6 +4,7 @@ import { Search, MapPin, Loader2 } from 'lucide-react'
 
 const LISTING_TYPES = [
   { value: 'sale', label: 'Buy' },
+  { value: 'pending', label: 'Pending' },
   { value: 'rent', label: 'Rent' },
   { value: 'sold', label: 'Sold' },
   { value: 'coming_soon', label: 'Coming Soon' },
@@ -25,10 +26,10 @@ const TRISTATE = [
 ]
 
 export default function SearchForm({ onSearch, onLoading }) {
+  const [listingTypes, setListingTypes] = useState(['sale'])
   const [criteria, setCriteria] = useState({
     location: '',
     radius_miles: 25,
-    listing_type: 'sale',
     property_types: [],
     price_min: '',
     price_max: '',
@@ -85,6 +86,17 @@ export default function SearchForm({ onSearch, onLoading }) {
     setCriteria({ ...criteria, excluded_zips: [...excluded] })
   }
 
+  const toggleListingType = (val) => {
+    setListingTypes(prev => {
+      if (prev.includes(val)) {
+        // Keep at least one selected
+        if (prev.length === 1) return prev
+        return prev.filter(v => v !== val)
+      }
+      return [...prev, val]
+    })
+  }
+
   const togglePropertyType = (pt) => {
     const types = new Set(criteria.property_types)
     if (types.has(pt)) {
@@ -97,6 +109,8 @@ export default function SearchForm({ onSearch, onLoading }) {
 
   const buildCriteria = () => {
     const c = { ...criteria }
+    // Send listing types as array (backend supports listing_types)
+    c.listing_types = listingTypes
     // Convert empty strings to null for numeric fields
     for (const key of ['price_min', 'price_max', 'bedrooms_min', 'bathrooms_min',
       'sqft_min', 'sqft_max', 'lot_sqft_min', 'lot_sqft_max', 'year_built_min',
@@ -215,13 +229,13 @@ export default function SearchForm({ onSearch, onLoading }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Looking to</label>
-          <div className="flex gap-1">
+          <div className="flex gap-1 flex-wrap">
             {LISTING_TYPES.map(lt => (
               <button
                 key={lt.value}
-                onClick={() => setCriteria({ ...criteria, listing_type: lt.value })}
+                onClick={() => toggleListingType(lt.value)}
                 className={`flex-1 py-2 text-sm rounded-lg border transition-colors ${
-                  criteria.listing_type === lt.value
+                  listingTypes.includes(lt.value)
                     ? 'bg-blue-600 text-white border-blue-600'
                     : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
                 }`}

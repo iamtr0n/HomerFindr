@@ -105,8 +105,17 @@ def show_splash() -> None:
         )
         live.update(_build_frame(rendered, __version__))
 
-        # Hold before clearing
-        time.sleep(1.4)
+        # Brief hold so the full logo is visible before menu appears
+        time.sleep(0.8)
 
-    # Live fully exited — safe for questionary prompts
-    console.clear()
+    # Live fully exited — logo stays visible above the menu
+    from rich.columns import Columns
+    from rich.text import Text as RText
+    cmds = (
+        "[bold cyan]homesearch[/bold cyan]          [dim]Launch TUI (this menu)[/dim]\n"
+        "[bold cyan]homesearch search[/bold cyan]   [dim]Jump straight to search wizard[/dim]\n"
+        "[bold cyan]homesearch serve[/bold cyan]    [dim]Start the web UI server[/dim]\n"
+        "[bold cyan]homesearch report[/bold cyan]   [dim]Send email report now[/dim]\n"
+        "[bold cyan]homesearch saved[/bold cyan]    [dim]list / run / delete / toggle[/dim]"
+    )
+    console.print(Panel(cmds, title="[dim]CLI Commands[/dim]", border_style="dim", padding=(0, 2)))

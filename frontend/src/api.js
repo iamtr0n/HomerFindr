@@ -28,6 +28,10 @@ export const api = {
     body: JSON.stringify({ criteria }),
   }),
 
+  // Location autocomplete
+  searchLocations: (query) =>
+    request(`/locations/search?q=${encodeURIComponent(query)}`),
+
   // ZIP discovery
   discoverZips: (location, radius = 25) =>
     request(`/zips/discover?location=${encodeURIComponent(location)}&radius=${radius}`),

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { api } from '../api'
 import { Search, MapPin, Loader2 } from 'lucide-react'
 
@@ -52,6 +52,10 @@ export default function SearchForm({ onSearch, onLoading }) {
   const [zipLoading, setZipLoading] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const [saveName, setSaveName] = useState('')
+  const [suggestions, setSuggestions] = useState([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const debounceRef = useRef(null)
+  const wrapperRef = useRef(null)
 
   const set = (field) => (e) => setCriteria({ ...criteria, [field]: e.target.value })
   const setNum = (field) => (e) => setCriteria({ ...criteria, [field]: e.target.value === '' ? '' : Number(e.target.value) })
@@ -112,15 +116,55 @@ export default function SearchForm({ onSearch, onLoading }) {
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
           <div className="flex gap-2">
-            <div className="relative flex-1">
+            <div className="relative flex-1" ref={wrapperRef}>
               <MapPin size={16} className="absolute left-3 top-2.5 text-gray-400" />
               <input
                 type="text"
                 placeholder="City, State or ZIP code"
                 value={criteria.location}
-                onChange={set('location')}
+                onChange={(e) => {
+                  const val = e.target.value
+                  setCriteria({ ...criteria, location: val })
+                  clearTimeout(debounceRef.current)
+                  if (val.length >= 3) {
+                    debounceRef.current = setTimeout(async () => {
+                      try {
+                        const data = await api.searchLocations(val)
+                        setSuggestions(data.suggestions || [])
+                        setShowSuggestions(true)
+                      } catch (_) {
+                        setSuggestions([])
+                      }
+                    }, 300)
+                  } else {
+                    setSuggestions([])
+                    setShowSuggestions(false)
+                  }
+                }}
+                onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true) }}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                onKeyDown={(e) => { if (e.key === 'Escape') setShowSuggestions(false) }}
                 className="w-full pl-9 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
+              {showSuggestions && suggestions.length > 0 && (
+                <ul className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                  {suggestions.map((s, i) => (
+                    <li
+                      key={`${s.city}-${s.state}-${i}`}
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        setCriteria({ ...criteria, location: `${s.city}, ${s.state}` })
+                        setShowSuggestions(false)
+                        setSuggestions([])
+                      }}
+                      className="px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 flex items-center gap-2"
+                    >
+                      <MapPin size={14} className="text-gray-400 shrink-0" />
+                      <span>{s.city}, <span className="text-gray-500">{s.state}</span></span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
             <button
               onClick={discoverZips}

@@ -318,6 +318,11 @@ def _passes_filters(listing: Listing, criteria: SearchCriteria) -> bool:
         if listing.property_type not in [pt.value for pt in criteria.property_types]:
             return False
 
+    # House style filter — skip listings whose style doesn't match any selected style
+    if criteria.house_styles and listing.house_style:
+        if not any(s in listing.house_style for s in criteria.house_styles):
+            return False
+
     # School rating minimum
     if criteria.school_rating_min and listing.school_rating and listing.school_rating < criteria.school_rating_min:
         return False

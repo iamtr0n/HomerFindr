@@ -68,6 +68,8 @@ class SearchCriteria(BaseModel):
     avoid_highways: bool = False
     school_rating_min: Optional[int] = None  # 1-10
 
+    house_styles: list[str] = Field(default_factory=list)  # e.g. ["cape_cod", "ranch"]
+
 
 class Listing(BaseModel):
     """A normalized property listing from any source."""
@@ -104,6 +106,7 @@ class Listing(BaseModel):
     longitude: Optional[float] = None
     photo_url: str = ""
     source_url: str = ""
+    house_style: Optional[str] = None  # e.g. "cape_cod", "ranch", "colonial"
     match_score: int = 0
     match_badges: list[str] = Field(default_factory=list)
     is_gold_star: bool = False

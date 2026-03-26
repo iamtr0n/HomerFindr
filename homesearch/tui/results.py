@@ -186,6 +186,8 @@ def _show_detail_card(listing: Listing, max_score: int) -> str:
     row("Year Built", listing.year_built)
     row("Stories", listing.stories)
 
+    if listing.house_style:
+        row("Style", listing.house_style.replace("_", " ").title())
     row("Garage", "Yes" if listing.has_garage else ("No" if listing.has_garage is False else None))
     row("Basement", "Yes" if listing.has_basement else ("No" if listing.has_basement is False else None))
     row("HOA", f"${listing.hoa_monthly:.0f}/mo" if listing.hoa_monthly else None)

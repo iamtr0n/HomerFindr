@@ -154,8 +154,12 @@ class HomeHarvestProvider(BaseProvider):
             from homesearch.services.school_service import get_school_rating_from_row
             school_rating, school_district = get_school_rating_from_row(row)
 
+            # Raw house style (e.g. "CAPE_COD", "RANCH", "COLONIAL")
+            raw_style = str(row.get("style", "") or "").strip()
+            house_style = raw_style.lower().replace(" ", "_") if raw_style else None
+
             # Property type mapping
-            ptype = str(row.get("style", "") or row.get("property_type", "") or "").lower()
+            ptype = str(raw_style or row.get("property_type", "") or "").lower()
             property_type = "single_family"
             if "condo" in ptype:
                 property_type = "condo"
@@ -196,6 +200,7 @@ class HomeHarvestProvider(BaseProvider):
                 has_ac=has_ac,
                 heat_type=heat_type,
                 has_pool=has_pool,
+                house_style=house_style,
                 school_rating=school_rating,
                 school_district=school_district,
                 year_built=year_built,

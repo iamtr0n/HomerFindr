@@ -137,6 +137,9 @@ def _display_summary(criteria: SearchCriteria) -> None:
     if criteria.property_types:
         table.add_row("Property type", ", ".join(pt.value for pt in criteria.property_types))
 
+    if criteria.house_styles:
+        table.add_row("House styles", ", ".join(s.replace("_", " ").title() for s in criteria.house_styles))
+
     add("Location", criteria.location)
     add("Radius", f"{criteria.radius_miles} miles")
 
@@ -253,6 +256,41 @@ def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
         "Land": PropertyType.LAND,
     }
     property_types = [] if prop_answer == "Any" else [prop_map[prop_answer]]
+
+    # ------------------------------------------------------------------
+    # 2b. House Style (only shown for single-family or "any")
+    # ------------------------------------------------------------------
+    house_styles: list[str] = []
+    if prop_answer in ("Any", "Single Family"):
+        STYLE_CHOICES = [
+            "Cape Cod", "Ranch", "Colonial", "Split Level", "Raised Ranch",
+            "Contemporary", "Victorian", "Craftsman", "Bi-Level", "Tudor",
+            "Mediterranean", "Farmhouse",
+        ]
+        style_answers = questionary.checkbox(
+            "House style(s):",
+            choices=STYLE_CHOICES,
+            style=HOUSE_STYLE,
+            instruction="(Space to select, Enter to skip/confirm)",
+        ).ask()
+        if style_answers is None:
+            return None
+        # Map labels to raw style substrings used in homeharvest data
+        _style_key_map = {
+            "Cape Cod": "cape_cod",
+            "Ranch": "ranch",
+            "Colonial": "colonial",
+            "Split Level": "split_level",
+            "Raised Ranch": "raised_ranch",
+            "Contemporary": "contemporary",
+            "Victorian": "victorian",
+            "Craftsman": "craftsman",
+            "Bi-Level": "bi_level",
+            "Tudor": "tudor",
+            "Mediterranean": "mediterranean",
+            "Farmhouse": "farmhouse",
+        }
+        house_styles = [_style_key_map[s] for s in style_answers if s in _style_key_map]
 
     # ------------------------------------------------------------------
     # 3. Radius (moved before location so it applies to all ZIP browser calls)
@@ -574,6 +612,7 @@ def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
         excluded_zips=excluded_zips,
         listing_type=listing_type,
         property_types=property_types,
+        house_styles=house_styles,
         price_min=price_min,
         price_max=price_max,
         bedrooms_min=bedrooms_min,

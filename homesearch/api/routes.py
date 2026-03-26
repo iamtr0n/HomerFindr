@@ -47,13 +47,16 @@ class SearchResponse(BaseModel):
     total: int
     search_id: Optional[int] = None
     search_name: Optional[str] = None
+    provider_errors: list[str] = []
 
 
 @app.post("/api/search/preview", response_model=SearchResponse)
 def preview_search(req: SearchRequest):
     """Run a search without saving it."""
-    results = run_search(req.criteria)
-    return SearchResponse(results=results, total=len(results))
+    provider_errors: list[str] = []
+    results = run_search(req.criteria, errors=provider_errors)
+    return SearchResponse(results=results, total=len(results),
+                          provider_errors=provider_errors)
 
 
 @app.post("/api/searches", response_model=SearchResponse)
@@ -62,10 +65,12 @@ def create_and_run_search(req: SearchRequest):
     name = req.save_as or f"Search {req.criteria.location}"
     saved = SavedSearch(name=name, criteria=req.criteria)
     search_id = db.save_search(saved)
-    results = run_search(req.criteria, search_id=search_id)
+    provider_errors: list[str] = []
+    results = run_search(req.criteria, search_id=search_id, errors=provider_errors)
     return SearchResponse(
         results=results, total=len(results),
         search_id=search_id, search_name=name,
+        provider_errors=provider_errors,
     )
 
 
@@ -114,10 +119,12 @@ def run_saved_search(search_id: int):
     search = db.get_saved_search(search_id)
     if not search:
         raise HTTPException(404, "Search not found")
-    results = run_search(search.criteria, search_id=search_id)
+    provider_errors: list[str] = []
+    results = run_search(search.criteria, search_id=search_id, errors=provider_errors)
     return SearchResponse(
         results=results, total=len(results),
         search_id=search_id, search_name=search.name,
+        provider_errors=provider_errors,
     )
 
 

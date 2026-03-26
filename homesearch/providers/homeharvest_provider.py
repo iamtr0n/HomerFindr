@@ -115,7 +115,11 @@ class HomeHarvestProvider(BaseProvider):
             has_garage = None
             has_basement = None
             garage_spaces = None
-            if row.get("parking_garage") or "garage" in desc:
+            try:
+                _pg = bool(row.get("parking_garage") or False)
+            except (TypeError, ValueError):
+                _pg = False
+            if _pg or "garage" in desc:
                 has_garage = True
             if "basement" in desc:
                 has_basement = True

@@ -1,6 +1,7 @@
 """Core search orchestration: fans out to providers, dedupes, filters."""
 
 import math
+import re
 from datetime import datetime
 from typing import Optional
 
@@ -39,6 +40,7 @@ def run_search(
     criteria: SearchCriteria,
     search_id: Optional[int] = None,
     use_zip_discovery: bool = True,
+    errors: Optional[list] = None,
 ) -> list[Listing]:
     """Execute a search across all providers, dedupe, filter, and return results.
 
@@ -58,7 +60,10 @@ def run_search(
             results = provider.search(criteria)
             all_listings.extend(results)
         except Exception as e:
+            msg = f"{provider.name}: {e}"
             print(f"[{provider.name}] Error: {e}")
+            if errors is not None:
+                errors.append(msg)
 
     # Deduplicate by address (normalized)
     seen_addresses: dict[str, Listing] = {}
@@ -92,10 +97,18 @@ def run_search(
 def _normalize_address(address: str) -> str:
     """Normalize address for dedup comparison."""
     addr = address.lower().strip()
+    # Remove unit/apartment designators
+    addr = re.sub(r'\b(apt|unit|suite|ste|#)\s*\S+', '', addr)
+    # Normalize street suffixes
     for old, new in [("street", "st"), ("avenue", "ave"), ("drive", "dr"),
                      ("boulevard", "blvd"), ("road", "rd"), ("lane", "ln"),
                      ("court", "ct"), ("place", "pl"), (".", ""), (",", " ")]:
         addr = addr.replace(old, new)
+    # Normalize directionals
+    for old, new in [("north", "n"), ("south", "s"), ("east", "e"), ("west", "w"),
+                     ("northeast", "ne"), ("northwest", "nw"),
+                     ("southeast", "se"), ("southwest", "sw")]:
+        addr = addr.replace(f" {old} ", f" {new} ")
     return " ".join(addr.split())
 
 

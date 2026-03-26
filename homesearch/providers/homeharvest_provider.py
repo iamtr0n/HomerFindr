@@ -21,7 +21,7 @@ class HomeHarvestProvider(BaseProvider):
     def name(self) -> str:
         return "realtor"
 
-    def search(self, criteria: SearchCriteria) -> list[Listing]:
+    def search(self, criteria: SearchCriteria, on_progress=None) -> list[Listing]:
         try:
             import homeharvest
         except ImportError:
@@ -30,10 +30,13 @@ class HomeHarvestProvider(BaseProvider):
 
         locations = self._build_locations(criteria)
         listing_type = _LISTING_TYPE_MAP.get(criteria.listing_type, "for_sale")
+        total = len(locations)
 
         all_listings: list[Listing] = []
 
-        for location in locations:
+        for idx, location in enumerate(locations, 1):
+            if on_progress:
+                on_progress(idx, total, location)
             try:
                 time.sleep(1.5)  # Rate limiting - be respectful
                 df = homeharvest.scrape_property(

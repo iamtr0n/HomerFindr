@@ -9,12 +9,15 @@ class BaseProvider(ABC):
     """Interface that every data source must implement."""
 
     @abstractmethod
-    def search(self, criteria: SearchCriteria) -> list[Listing]:
+    def search(self, criteria: SearchCriteria, on_progress=None) -> list[Listing]:
         """Fetch listings matching the given criteria.
 
         Providers should do their best to map criteria fields to platform-specific
         filters. Fields the platform doesn't support natively will be filtered
         client-side by the SearchService.
+
+        on_progress: optional callable(current: int, total: int, location: str)
+        called after each location/ZIP is searched so the UI can show progress.
         """
 
     @property

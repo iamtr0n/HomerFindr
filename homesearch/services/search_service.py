@@ -42,6 +42,7 @@ def run_search(
     use_zip_discovery: bool = True,
     errors: Optional[list] = None,
     pre_filter_counts: Optional[list] = None,
+    on_progress=None,
 ) -> list[Listing]:
     """Execute a search across all providers, dedupe, filter, and return results.
 
@@ -60,7 +61,7 @@ def run_search(
 
     for provider in providers:
         try:
-            results = provider.search(criteria)
+            results = provider.search(criteria, on_progress=on_progress)
             all_listings.extend(results)
         except Exception as e:
             msg = f"{provider.name}: {e}"

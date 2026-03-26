@@ -23,23 +23,36 @@ from homesearch.tui.styles import (
 
 
 def execute_search_with_spinner(criteria: SearchCriteria) -> tuple[list[Listing], int]:
-    """Run search in background thread with animated Rich spinner.
+    """Run search in background thread with live ZIP progress bar.
 
     Per D-17: threading.Thread(daemon=True) for non-blocking.
-    Per D-18: Provider name cycling in spinner text.
     CRITICAL: Rich Live must fully exit before any questionary prompt.
+    Worker never touches Live/Progress directly — updates shared dict only.
 
     Returns (results, pre_filter_count) so callers can diagnose zero-result causes.
-    pre_filter_count is the number of deduplicated listings before client-side filters.
     """
     results: list[Listing] = []
     error: list[Exception] = []
     pre_filter_counts: list[int] = []
     done_event = threading.Event()
 
+    # Shared state updated by worker thread; read by main thread for display.
+    # Dict assignment is GIL-atomic in CPython — no explicit lock needed.
+    progress: dict = {"current": 0, "total": 0, "location": ""}
+
+    def _on_progress(current: int, total: int, location: str) -> None:
+        progress["current"] = current
+        progress["total"] = total
+        progress["location"] = location
+
     def _search_worker():
         try:
-            found = run_search(criteria, use_zip_discovery=True, pre_filter_counts=pre_filter_counts)
+            found = run_search(
+                criteria,
+                use_zip_discovery=True,
+                pre_filter_counts=pre_filter_counts,
+                on_progress=_on_progress,
+            )
             results.extend(found)
         except Exception as e:
             error.append(e)
@@ -49,22 +62,31 @@ def execute_search_with_spinner(criteria: SearchCriteria) -> tuple[list[Listing]
     thread = threading.Thread(target=_search_worker, daemon=True)
     thread.start()
 
-    provider_names = [p.name for p in get_providers()]
-    if not provider_names:
-        provider_names = ["providers"]
-
     spinners = ["\u280b", "\u2819", "\u2839", "\u2838", "\u283c", "\u2834", "\u2826", "\u2827", "\u2807", "\u280f"]
-    idx = 0
+    spin_idx = 0
+    bar_width = 24
 
-    with Live(console=console, refresh_per_second=10) as live:
+    with Live(console=console, refresh_per_second=8) as live:
         while not done_event.is_set():
-            current = provider_names[idx // 3 % len(provider_names)]
-            spin_char = spinners[idx % len(spinners)]
-            live.update(
-                Text(f"{spin_char}  \U0001f3e0 Searching {current}...", style="bold cyan")
-            )
-            done_event.wait(timeout=0.1)
-            idx += 1
+            cur = progress["current"]
+            tot = progress["total"]
+            spin = spinners[spin_idx % len(spinners)]
+            spin_idx += 1
+
+            if tot > 0:
+                filled = int(bar_width * cur / tot)
+                bar = "█" * filled + "░" * (bar_width - filled)
+                pct = int(100 * cur / tot)
+                live.update(
+                    Text(
+                        f"{spin}  \U0001f3e0  Searching ZIP {cur}/{tot}  [{bar}] {pct}%",
+                        style="bold cyan",
+                    )
+                )
+            else:
+                live.update(Text(f"{spin}  \U0001f3e0  Discovering search area...", style="bold cyan"))
+
+            done_event.wait(timeout=0.125)
 
     # Live fully exited — safe for console.print and questionary
     thread.join(timeout=1.0)

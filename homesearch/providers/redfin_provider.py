@@ -12,7 +12,7 @@ class RedfinProvider(BaseProvider):
     def name(self) -> str:
         return "redfin"
 
-    def search(self, criteria: SearchCriteria) -> list[Listing]:
+    def search(self, criteria: SearchCriteria, on_progress=None) -> list[Listing]:
         try:
             from redfin import Redfin
         except ImportError:
@@ -21,9 +21,12 @@ class RedfinProvider(BaseProvider):
 
         client = Redfin()
         locations = self._build_locations(criteria)
+        total = len(locations)
         all_listings: list[Listing] = []
 
-        for location in locations:
+        for idx, location in enumerate(locations, 1):
+            if on_progress:
+                on_progress(idx, total, location)
             try:
                 time.sleep(2)  # Rate limiting
                 response = client.search(location)

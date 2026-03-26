@@ -35,12 +35,14 @@ def _parse_price_range(choice: str) -> tuple[Optional[int], Optional[int]]:
 def _parse_multi_price(selections: list[str]) -> tuple[Optional[int], Optional[int]]:
     """Combine multiple price range selections into a single (price_min, price_max)."""
     range_map = {
-        "Under $200k":    (None, 200_000),
-        "$200k - $350k":  (200_000, 350_000),
-        "$350k - $500k":  (350_000, 500_000),
-        "$500k - $750k":  (500_000, 750_000),
-        "$750k - $1M":    (750_000, 1_000_000),
-        "Over $1M":       (1_000_000, None),
+        "Under $200k":      (None, 200_000),
+        "$200k - $350k":    (200_000, 350_000),
+        "$350k - $500k":    (350_000, 500_000),
+        "$500k - $750k":    (500_000, 750_000),
+        "$750k - $1M":      (750_000, 1_000_000),
+        "$1M - $1.25M":     (1_000_000, 1_250_000),
+        "$1.25M - $1.5M":   (1_250_000, 1_500_000),
+        "Over $1.5M":       (1_500_000, None),
     }
     mins = []
     maxes = []
@@ -398,7 +400,9 @@ def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
         "$350k - $500k",
         "$500k - $750k",
         "$750k - $1M",
-        "Over $1M",
+        "$1M - $1.25M",
+        "$1.25M - $1.5M",
+        "Over $1.5M",
         "Custom range",
     ]
     price_answers = questionary.checkbox(

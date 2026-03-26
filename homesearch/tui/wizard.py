@@ -256,7 +256,7 @@ def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
     radius_miles = int(radius_answer.split()[0])
 
     # ------------------------------------------------------------------
-    # 5. ZIP Discovery
+    # 5. ZIP Discovery (automatic — no manual ZIP selection needed)
     # ------------------------------------------------------------------
     zip_codes: list[str] = []
     excluded_zips: list[str] = []
@@ -265,34 +265,16 @@ def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
         discovered = discover_zip_codes(location, radius_miles)
 
     if discovered:
-        display_zips = discovered[:30]
+        # Cap at 50 most-populated ZIPs to keep search time reasonable (1.5s/ZIP rate limit)
+        top_zips = discovered[:50]
+        zip_codes = [z.zipcode for z in top_zips]
+        extra = len(discovered) - len(top_zips)
+        note = f" (top {len(zip_codes)} by population)" if extra > 0 else ""
         console.print(
-            f"[green]Found {len(discovered)} ZIP code(s) within {radius_miles} miles of {location}.[/green]"
+            f"[green]✓ Searching {len(zip_codes)} ZIP code(s) within {radius_miles} miles of {location}{note}.[/green]"
         )
-
-        zip_choices = [
-            questionary.Choice(
-                title=f"{z.zipcode} — {z.city}, {z.state}",
-                value=z.zipcode,
-                checked=True,
-            )
-            for z in display_zips
-        ]
-
-        selected = questionary.checkbox(
-            "Select ZIP codes to include (uncheck to exclude):",
-            choices=zip_choices,
-            style=HOUSE_STYLE,
-            instruction="(Space to toggle, Enter to confirm)",
-        ).ask()
-        if selected is None:
-            return None
-
-        all_zip_strs = [z.zipcode for z in display_zips]
-        zip_codes = selected
-        excluded_zips = [z for z in all_zip_strs if z not in selected]
     else:
-        console.print("[yellow]No ZIP codes found for that location — searching by location string.[/yellow]")
+        console.print("[yellow]No ZIP codes found — searching by location name.[/yellow]")
 
     # ------------------------------------------------------------------
     # 6. Price Range

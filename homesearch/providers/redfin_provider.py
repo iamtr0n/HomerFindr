@@ -90,11 +90,12 @@ class RedfinProvider(BaseProvider):
         return []
 
     def _get_listing_type_num(self, criteria: SearchCriteria) -> int:
-        if criteria.listing_type == ListingType.RENT:
+        lt = criteria.listing_types[0] if criteria.listing_types else criteria.listing_type
+        if lt == ListingType.RENT:
             return 2
-        if criteria.listing_type == ListingType.SOLD:
+        if lt == ListingType.SOLD:
             return 3
-        if criteria.listing_type == ListingType.COMING_SOON:
+        if lt == ListingType.COMING_SOON:
             return 4
         return 1  # For sale
 

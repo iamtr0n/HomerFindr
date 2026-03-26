@@ -131,8 +131,11 @@ def _display_summary(criteria: SearchCriteria) -> None:
         if value is not None and value != "" and value != [] and value != 0.0:
             table.add_row(field, str(value))
 
-    # Listing type is always set
-    table.add_row("Listing type", criteria.listing_type.value)
+    # Listing type(s)
+    if criteria.listing_types:
+        table.add_row("Listing type", ", ".join(lt.value for lt in criteria.listing_types))
+    else:
+        table.add_row("Listing type", criteria.listing_type.value)
 
     if criteria.property_types:
         table.add_row("Property type", ", ".join(pt.value for pt in criteria.property_types))
@@ -219,22 +222,26 @@ def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
     from homesearch.tui.zip_browser import show_zip_browser
 
     # ------------------------------------------------------------------
-    # 1. Listing Type (required — no instruction hint)
+    # 1. Listing Type (multi-select)
     # ------------------------------------------------------------------
-    listing_answer = questionary.select(
-        "Listing type:",
-        choices=["For Sale", "For Rent", "Recently Sold", "Coming Soon"],
-        style=HOUSE_STYLE,
-    ).ask()
-    if listing_answer is None:
-        return None
     listing_type_map = {
         "For Sale": ListingType.SALE,
         "For Rent": ListingType.RENT,
         "Recently Sold": ListingType.SOLD,
         "Coming Soon": ListingType.COMING_SOON,
     }
-    listing_type = listing_type_map[listing_answer]
+    listing_answers = questionary.checkbox(
+        "Listing type(s):",
+        choices=list(listing_type_map.keys()),
+        style=HOUSE_STYLE,
+        instruction="(Space to select, Enter to confirm)",
+    ).ask()
+    if listing_answers is None:
+        return None
+    if not listing_answers:
+        listing_answers = ["For Sale"]  # default if nothing selected
+    listing_types = [listing_type_map[a] for a in listing_answers]
+    listing_type = listing_types[0]  # kept for backwards compat
 
     # ------------------------------------------------------------------
     # 2. Property Type
@@ -611,6 +618,7 @@ def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
         zip_codes=zip_codes,
         excluded_zips=excluded_zips,
         listing_type=listing_type,
+        listing_types=listing_types,
         property_types=property_types,
         house_styles=house_styles,
         price_min=price_min,

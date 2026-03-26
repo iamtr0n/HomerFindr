@@ -34,7 +34,8 @@ class SearchCriteria(BaseModel):
     zip_codes: list[str] = Field(default_factory=list)  # Specific ZIPs to include
     excluded_zips: list[str] = Field(default_factory=list)  # ZIPs to skip
 
-    listing_type: ListingType = ListingType.SALE
+    listing_type: ListingType = ListingType.SALE  # kept for backwards compat / single-type searches
+    listing_types: list[ListingType] = Field(default_factory=list)  # multi-select; overrides listing_type when set
     property_types: list[PropertyType] = Field(default_factory=list)
 
     price_min: Optional[int] = None

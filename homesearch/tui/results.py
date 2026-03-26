@@ -24,7 +24,7 @@ from homesearch.tui.styles import (
 
 
 def execute_search_with_spinner(criteria: SearchCriteria) -> tuple[list[Listing], int, list[Listing]]:
-    """Run search in background thread with live ZIP progress bar."""
+    """Run parallel ZIP search with live results table."""
     results: list[Listing] = []
     error: list[Exception] = []
     pre_filter_counts: list[int] = []
@@ -32,12 +32,18 @@ def execute_search_with_spinner(criteria: SearchCriteria) -> tuple[list[Listing]
     done_event = threading.Event()
 
     progress: dict = {"current": 0, "total": 0, "location": "", "found": 0}
+    partial_listings: list[Listing] = []
+    partial_lock = threading.Lock()
 
     def _on_progress(current: int, total: int, location: str, found: int = 0) -> None:
         progress["current"] = current
         progress["total"] = total
         progress["location"] = location
         progress["found"] = found
+
+    def _on_partial(batch: list[Listing]) -> None:
+        with partial_lock:
+            partial_listings.extend(batch)
 
     def _search_worker():
         try:
@@ -47,6 +53,7 @@ def execute_search_with_spinner(criteria: SearchCriteria) -> tuple[list[Listing]
                 pre_filter_counts=pre_filter_counts,
                 raw_listings_out=raw_listings_out,
                 on_progress=_on_progress,
+                on_partial=_on_partial,
             )
             results.extend(found)
         except Exception as e:
@@ -59,9 +66,11 @@ def execute_search_with_spinner(criteria: SearchCriteria) -> tuple[list[Listing]
 
     spinners = ["\u280b", "\u2819", "\u2839", "\u2838", "\u283c", "\u2834", "\u2826", "\u2827", "\u2807", "\u280f"]
     spin_idx = 0
-    bar_width = 24
+    bar_width = 20
 
-    with Live(console=console, refresh_per_second=8) as live:
+    from rich.console import Group
+
+    with Live(console=console, refresh_per_second=4) as live:
         while not done_event.is_set():
             cur = progress["current"]
             tot = progress["total"]
@@ -69,21 +78,46 @@ def execute_search_with_spinner(criteria: SearchCriteria) -> tuple[list[Listing]
             spin = spinners[spin_idx % len(spinners)]
             spin_idx += 1
 
-            found_str = f"  ·  {found} found" if found > 0 else ""
+            # Progress header
             if tot > 0:
                 filled = int(bar_width * cur / tot)
                 bar = "█" * filled + "░" * (bar_width - filled)
                 pct = int(100 * cur / tot)
-                live.update(
-                    Text(
-                        f"{spin}  🏠  Searching ZIP {cur}/{tot}  [{bar}] {pct}%{found_str}",
-                        style="bold cyan",
-                    )
+                active = min(3, tot - cur)
+                parallel_note = f"  [dim]({active} ZIPs in parallel)[/dim]" if active > 1 else ""
+                header = Text.from_markup(
+                    f"{spin}  [bold cyan]🏠  {cur}/{tot} ZIPs  [{bar}] {pct}%  ·  {found} found[/bold cyan]{parallel_note}"
                 )
             else:
-                live.update(Text(f"{spin}  🏠  Discovering search area...{found_str}", style="bold cyan"))
+                header = Text.from_markup(f"{spin}  [bold cyan]🏠  Discovering search area...[/bold cyan]")
 
-            done_event.wait(timeout=0.125)
+            # Live results preview
+            with partial_lock:
+                snapshot = sorted(
+                    [l for l in partial_listings if l.price],
+                    key=lambda l: l.price,
+                )[:12]
+
+            if snapshot:
+                tbl = Table(show_header=True, header_style="dim cyan", box=None, padding=(0, 1))
+                tbl.add_column("Price", style="bold green", min_width=11)
+                tbl.add_column("Beds/Ba", style="cyan", min_width=7)
+                tbl.add_column("Sqft", style="white", min_width=7)
+                tbl.add_column("Address", style="white")
+                for l in snapshot:
+                    price = f"${l.price:,.0f}"
+                    beds = f"{l.bedrooms or '?'}bd/{l.bathrooms or '?'}ba"
+                    sqft = f"{l.sqft:,}" if l.sqft else "—"
+                    addr = l.address[:44] + ("…" if len(l.address) > 44 else "")
+                    tbl.add_row(price, beds, sqft, addr)
+                note = Text.from_markup(
+                    f"[dim]  Live preview — {len(partial_listings)} raw listings so far (filters apply at end)[/dim]"
+                )
+                live.update(Group(header, Text(""), tbl, note))
+            else:
+                live.update(header)
+
+            done_event.wait(timeout=0.25)
 
     thread.join(timeout=1.0)
 
@@ -337,17 +371,17 @@ def _diagnose_filters(raw: list[Listing], criteria: SearchCriteria) -> list[tupl
             hits.append(("Has garage", n, "Remove the garage requirement"))
 
     if criteria.has_fireplace is True:
-        n = _elim(lambda l: l.has_fireplace is not True)
+        n = _elim(lambda l: l.has_fireplace is False)
         if n:
             hits.append(("Has fireplace", n, "Remove the fireplace requirement"))
 
     if criteria.has_pool is True:
-        n = _elim(lambda l: l.has_pool is not True)
+        n = _elim(lambda l: l.has_pool is False)
         if n:
             hits.append(("Has pool", n, "Remove the pool requirement"))
 
     if criteria.has_ac is True:
-        n = _elim(lambda l: l.has_ac is not True)
+        n = _elim(lambda l: l.has_ac is False)
         if n:
             hits.append(("Has A/C", n, "Remove the A/C requirement"))
 
@@ -370,8 +404,60 @@ def _diagnose_filters(raw: list[Listing], criteria: SearchCriteria) -> list[tupl
         if n:
             hits.append(("House style", n, "Add more house styles or remove the style filter"))
 
+    if criteria.heat_type and criteria.heat_type != "any":
+        n = _elim(lambda l: l.heat_type is not None and l.heat_type != criteria.heat_type)
+        if n:
+            hits.append((f"Heat: {criteria.heat_type}", n, "Change heat type to 'Don't care'"))
+
     hits.sort(key=lambda x: -x[1])
     return hits
+
+
+def _show_active_criteria(criteria: SearchCriteria) -> None:
+    """Print a summary of every active filter — shown whenever results are zero."""
+    lines = []
+    if criteria.price_min or criteria.price_max:
+        lo = f"${criteria.price_min:,.0f}" if criteria.price_min else "Any"
+        hi = f"${criteria.price_max:,.0f}" if criteria.price_max else "Any"
+        lines.append(f"Price: {lo} – {hi}")
+    if criteria.bedrooms_min:
+        lines.append(f"Beds: {criteria.bedrooms_min}+")
+    if criteria.bathrooms_min:
+        lines.append(f"Baths: {criteria.bathrooms_min}+")
+    if criteria.sqft_min or criteria.sqft_max:
+        lo = f"{criteria.sqft_min:,}" if criteria.sqft_min else "Any"
+        hi = f"{criteria.sqft_max:,}" if criteria.sqft_max else "Any"
+        lines.append(f"Sqft: {lo} – {hi}")
+    if criteria.lot_sqft_min or criteria.lot_sqft_max:
+        lo = f"{criteria.lot_sqft_min:,}" if criteria.lot_sqft_min else "Any"
+        hi = f"{criteria.lot_sqft_max:,}" if criteria.lot_sqft_max else "Any"
+        lines.append(f"Lot: {lo} – {hi} sqft")
+    if criteria.year_built_min:
+        lines.append(f"Year built: {criteria.year_built_min}+")
+    if criteria.stories_min:
+        lines.append(f"Stories: {criteria.stories_min}+")
+    if criteria.has_basement is True:
+        lines.append("Basement: Must have")
+    if criteria.has_garage is True:
+        lines.append("Garage: Must have")
+    if criteria.has_fireplace is True:
+        lines.append("Fireplace: Must have")
+    if criteria.has_ac is True:
+        lines.append("A/C: Must have")
+    if criteria.has_pool is True:
+        lines.append("Pool: Must have")
+    if criteria.hoa_max is not None:
+        lines.append(f"HOA max: ${criteria.hoa_max:.0f}/mo")
+    if criteria.heat_type and criteria.heat_type != "any":
+        lines.append(f"Heat type: {criteria.heat_type}")
+    if criteria.property_types:
+        lines.append(f"Property type: {', '.join(pt.value for pt in criteria.property_types)}")
+    if criteria.house_styles:
+        lines.append(f"House styles: {', '.join(s.replace('_', ' ').title() for s in criteria.house_styles)}")
+    if lines:
+        console.print("\n[dim]Active filters on this search:[/dim]")
+        for l in lines:
+            console.print(f"  [dim]·[/dim] {l}")
 
 
 def _show_no_results(criteria: SearchCriteria, pre_filter_count: int, raw_listings: list[Listing] | None = None) -> None:
@@ -395,10 +481,12 @@ def _show_no_results(criteria: SearchCriteria, pre_filter_count: int, raw_listin
                     else:
                         console.print(f"  [yellow]{label:<22}[/yellow]  [{bar}] {count}/{pre_filter_count} eliminated")
                         console.print(f"    [dim]↳ {rec}[/dim]")
+        _show_active_criteria(criteria)
         console.print('\n[dim]Use "Edit a filter" at the search prompt to adjust any of these.[/dim]')
     else:
-        console.print("[yellow]No properties found matching your criteria.[/yellow]")
-        console.print("[dim]Try a different location or broader search area.[/dim]")
+        console.print("[yellow]No listings returned from providers — nothing to filter.[/yellow]")
+        console.print("[dim]This usually means the location wasn't recognized or the provider had a temporary error.[/dim]")
+        _show_active_criteria(criteria)
 
 
 def _offer_save_search(criteria: SearchCriteria) -> None:

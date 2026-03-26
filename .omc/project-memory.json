@@ -166,8 +166,8 @@
   "hotPaths": [
     {
       "path": "homesearch/tui/wizard.py",
-      "accessCount": 51,
-      "lastAccessed": 1774552020687,
+      "accessCount": 55,
+      "lastAccessed": 1774553168465,
       "type": "file"
     },
     {
@@ -178,9 +178,21 @@
     },
     {
       "path": "homesearch/services/search_service.py",
-      "accessCount": 30,
-      "lastAccessed": 1774551118336,
+      "accessCount": 38,
+      "lastAccessed": 1774552800895,
       "type": "directory"
+    },
+    {
+      "path": "homesearch/tui/results.py",
+      "accessCount": 33,
+      "lastAccessed": 1774553303332,
+      "type": "file"
+    },
+    {
+      "path": "homesearch/providers/homeharvest_provider.py",
+      "accessCount": 29,
+      "lastAccessed": 1774553312927,
+      "type": "file"
     },
     {
       "path": "homesearch/models.py",
@@ -192,18 +204,6 @@
       "path": "frontend/src/components/SearchForm.jsx",
       "accessCount": 23,
       "lastAccessed": 1774540502879,
-      "type": "file"
-    },
-    {
-      "path": "homesearch/providers/homeharvest_provider.py",
-      "accessCount": 22,
-      "lastAccessed": 1774551073960,
-      "type": "file"
-    },
-    {
-      "path": "homesearch/tui/results.py",
-      "accessCount": 22,
-      "lastAccessed": 1774551717802,
       "type": "file"
     },
     {
@@ -291,6 +291,12 @@
       "type": "file"
     },
     {
+      "path": "homesearch/providers/redfin_provider.py",
+      "accessCount": 4,
+      "lastAccessed": 1774552519342,
+      "type": "directory"
+    },
+    {
       "path": ".planning/quick/260326-ghj-cli-multi-city-zip-search-tool-with-spac/260326-ghj-SUMMARY.md",
       "accessCount": 3,
       "lastAccessed": 1774540799099,
@@ -303,9 +309,9 @@
       "type": "file"
     },
     {
-      "path": "homesearch/providers/redfin_provider.py",
+      "path": "homesearch",
       "accessCount": 3,
-      "lastAccessed": 1774546220697,
+      "lastAccessed": 1774552831663,
       "type": "directory"
     },
     {
@@ -355,12 +361,6 @@
       "accessCount": 2,
       "lastAccessed": 1774540659485,
       "type": "file"
-    },
-    {
-      "path": "homesearch",
-      "accessCount": 2,
-      "lastAccessed": 1774545620341,
-      "type": "directory"
     },
     {
       "path": ".planning/quick/260326-j1t-fix-coming-soon-invalidlistingtype-error/260326-j1t-PLAN.md",

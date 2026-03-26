@@ -45,6 +45,7 @@ def run_search(
     pre_filter_counts: Optional[list] = None,
     raw_listings_out: Optional[list] = None,
     on_progress=None,
+    on_partial=None,
 ) -> list[Listing]:
     """Execute a search across all providers, dedupe, filter, and return results.
 
@@ -68,7 +69,7 @@ def run_search(
 
     for provider in providers:
         try:
-            results = provider.search(criteria, on_progress=_wrapped_progress)
+            results = provider.search(criteria, on_progress=_wrapped_progress, on_partial=on_partial)
             all_listings.extend(results)
         except Exception as e:
             msg = f"{provider.name}: {e}"
@@ -323,7 +324,8 @@ def _passes_filters(listing: Listing, criteria: SearchCriteria) -> bool:
         return False
 
     if criteria.property_types:
-        if listing.property_type not in [pt.value for pt in criteria.property_types]:
+        pt_vals = [pt.value for pt in criteria.property_types]
+        if listing.property_type is not None and listing.property_type not in pt_vals:
             return False
 
     # House style filter — skip listings whose style doesn't match any selected style

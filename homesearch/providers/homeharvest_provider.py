@@ -1,7 +1,9 @@
 """Provider using the homeharvest package (Realtor.com / MLS data). Free, no API key."""
 
+import threading
 import time
 import traceback
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from homesearch.models import Listing, ListingType, SearchCriteria
 from homesearch.providers.base import BaseProvider
@@ -23,7 +25,7 @@ class HomeHarvestProvider(BaseProvider):
     def name(self) -> str:
         return "realtor"
 
-    def search(self, criteria: SearchCriteria, on_progress=None) -> list[Listing]:
+    def search(self, criteria: SearchCriteria, on_progress=None, on_partial=None) -> list[Listing]:
         try:
             import homeharvest
         except ImportError:
@@ -37,20 +39,19 @@ class HomeHarvestProvider(BaseProvider):
         hh_types = [_LISTING_TYPE_MAP.get(lt, "for_sale") for lt in types_to_run]
         hh_types = list(dict.fromkeys(hh_types))
 
-        # Batch all types into a single API call per location (not N calls per location)
         total = len(locations)
         include_sold = "sold" in hh_types
-
-        # If only one type, pass as string; otherwise pass list (homeharvest accepts both)
         listing_type_arg = hh_types[0] if len(hh_types) == 1 else hh_types
-        # Default listing_type string for _row_to_listing mapping (informational)
         default_lt = hh_types[0]
 
         all_listings: list[Listing] = []
+        lock = threading.Lock()
+        completed = [0]
 
-        for progress_idx, location in enumerate(locations, start=1):
-            if on_progress:
-                on_progress(progress_idx, total, location, len(all_listings))
+        def _fetch_one(args):
+            idx, location = args
+            # Stagger 3 parallel workers so requests don't all fire at once
+            time.sleep((idx % 3) * 0.6)
             try:
                 time.sleep(1.5)  # Rate limiting - be respectful
                 df = homeharvest.scrape_property(
@@ -58,18 +59,35 @@ class HomeHarvestProvider(BaseProvider):
                     listing_type=listing_type_arg,
                     past_days=30 if include_sold else None,
                 )
-
-                if df is None or df.empty:
-                    continue
-
-                for _, row in df.iterrows():
-                    listing = self._row_to_listing(row, default_lt)
-                    if listing:
-                        all_listings.append(listing)
-
+                batch: list[Listing] = []
+                if df is not None and not df.empty:
+                    for _, row in df.iterrows():
+                        listing = self._row_to_listing(row, default_lt)
+                        if listing:
+                            batch.append(listing)
+                return location, batch
             except Exception:
                 traceback.print_exc()
-                continue
+                return location, []
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            future_map = {
+                executor.submit(_fetch_one, (i, loc)): loc
+                for i, loc in enumerate(locations)
+            }
+            for future in as_completed(future_map):
+                try:
+                    location, batch = future.result()
+                except Exception as e:
+                    traceback.print_exc()
+                    location, batch = future_map[future], []
+                with lock:
+                    all_listings.extend(batch)
+                    completed[0] += 1
+                    if on_progress:
+                        on_progress(completed[0], total, location, len(all_listings))
+                    if on_partial and batch:
+                        on_partial(list(batch))
 
         return all_listings
 

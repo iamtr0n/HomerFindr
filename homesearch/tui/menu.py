@@ -1,9 +1,29 @@
 """Main menu loop — arrow-key navigation with questionary."""
 
+import threading
+
 import questionary
 
+from homesearch import __version__
 from homesearch.tui.styles import HOUSE_STYLE, console
 from homesearch.tui.splash import show_splash
+
+# Populated by background thread during splash
+_update_result: list[str] = []
+
+
+def _start_update_check() -> threading.Thread:
+    """Launch update check in background so it's ready by the time menu shows."""
+    from homesearch.services.update_service import check_for_update
+
+    def _check():
+        v = check_for_update(__version__)
+        if v:
+            _update_result.append(v)
+
+    t = threading.Thread(target=_check, daemon=True)
+    t.start()
+    return t
 
 
 def tui_main():
@@ -14,12 +34,26 @@ def tui_main():
     Per D-06: first-run check triggers wizard when no config exists.
     Per D-07: return to menu after any action (while True loop).
     """
+    # Start update check during splash so network latency is hidden
+    update_thread = _start_update_check()
+
     show_splash()
+
     # First-run check — triggers when no config file exists (D-06)
     from homesearch.tui.config import config_exists
     from homesearch.tui.first_run import run_first_run_wizard
     if not config_exists():
         run_first_run_wizard()
+
+    # Give the update check a brief moment to finish (it already had ~2s splash time)
+    update_thread.join(timeout=0.5)
+
+    if _update_result:
+        console.print(
+            f"\n[bold yellow]⬆  Update available: v{_update_result[0]}[/bold yellow]  "
+            f"[dim]Run: pip install --upgrade homesearch[/dim]\n"
+        )
+
     run_menu_loop()
 
 

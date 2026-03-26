@@ -1,92 +1,112 @@
-"""ASCII art house-themed splash screen with typewriter reveal animation."""
+"""HomerFindr splash screen — ASCII art, version badge, typewriter reveal."""
 
 import os
 import time
 
-from art import text2art
 from rich.live import Live
 from rich.panel import Panel
 from rich.text import Text
 
+from homesearch import __version__
 from homesearch.tui.styles import console
 
+# ---------------------------------------------------------------------------
+# Hardcoded ASCII logo — no library dependency, always renders correctly
+# ---------------------------------------------------------------------------
 
-def show_splash():
-    """Display the HomerFindr ASCII art splash with typewriter animation.
+_HOMER = [
+    r"  ██╗  ██╗ ██████╗ ███╗   ███╗███████╗██████╗ ",
+    r"  ██║  ██║██╔═══██╗████╗ ████║██╔════╝██╔══██╗",
+    r"  ███████║██║   ██║██╔████╔██║█████╗  ██████╔╝",
+    r"  ██╔══██║██║   ██║██║╚██╔╝██║██╔══╝  ██╔══██╗",
+    r"  ██║  ██║╚██████╔╝██║ ╚═╝ ██║███████╗██║  ██║",
+    r"  ╚═╝  ╚═╝ ╚═════╝ ╚═╝     ╚═╝╚══════╝╚═╝  ╚═╝",
+]
 
-    Per D-01: Large ASCII house art with gradient green-cyan via Rich.
-    Per D-02: Typewriter-style reveal using Rich Live, ~2s display, then clear.
-    Per D-03: Shows on every launch.
+_FINDR = [
+    r"  ███████╗██╗███╗   ██╗██████╗ ██████╗ ",
+    r"  ██╔════╝██║████╗  ██║██╔══██╗██╔══██╗",
+    r"  █████╗  ██║██╔██╗ ██║██║  ██║██████╔╝",
+    r"  ██╔══╝  ██║██║╚██╗██║██║  ██║██╔══██╗",
+    r"  ██║     ██║██║ ╚████║██████╔╝██║  ██║",
+    r"  ╚═╝     ╚═╝╚═╝  ╚═══╝╚═════╝ ╚═╝  ╚═╝",
+]
 
-    CRITICAL: The Live context MUST be fully exited before any questionary
-    prompt fires. Rich Live and questionary both take terminal ownership.
+_HOUSE = [
+    r"              /\    /\              ",
+    r"             /  \  /  \            ",
+    r"            / /\ \/ /\ \           ",
+    r"           /_/ /\ \ \ \_\          ",
+    r"          |  _/  \_  _  |          ",
+    r"          | | .--. | || |          ",
+    r"          | | |  | | || |          ",
+    r"          |_|_|__|_|_||_|          ",
+]
+
+
+def _build_frame(rendered: Text, version: str) -> Panel:
+    return Panel(
+        rendered,
+        border_style="green",
+        subtitle=f"[dim]v{version}  ·  Realtor.com  ·  Redfin[/dim]",
+        padding=(0, 2),
+    )
+
+
+def show_splash() -> None:
+    """Display the HomerFindr ASCII splash with typewriter animation.
+
+    Starts an update-check thread so results are ready by the time
+    the menu loop starts. Clears the terminal before returning.
     """
     try:
         cols = os.get_terminal_size().columns
     except OSError:
         cols = 80
 
-    # Generate ASCII art — fall back to smaller font on narrow terminals
-    ascii_art = text2art("HomerFindr", font="banner3-D")
-    first_line = ascii_art.splitlines()[0] if ascii_art.splitlines() else ""
-    if len(first_line) > cols - 4:
-        ascii_art = text2art("HomerFindr", font="small")
-
-    lines = ascii_art.splitlines()
-
-    # House ASCII art to display above the title
-    house = [
-        "        /\\",
-        "       /  \\",
-        "      /    \\",
-        "     /______\\",
-        "     |  __  |",
-        "     | |  | |",
-        "     |_|__|_|",
-    ]
-
     rendered = Text()
 
+    # Collapse to compact mode on very narrow terminals
+    compact = cols < 60
+
     with Live(console=console, refresh_per_second=20) as live:
-        # Typewriter reveal: house first
-        for line in house:
-            rendered.append(line + "\n", style="bold green")
-            live.update(
-                Panel(
-                    rendered,
-                    border_style="green",
-                    title="[bold green]HomerFindr[/bold green]",
-                    subtitle="[dim cyan]Find your home faster[/dim cyan]",
-                )
-            )
-            time.sleep(0.05)
+        # --- house art ---
+        if not compact:
+            for line in _HOUSE:
+                rendered.append(line + "\n", style="bold green")
+                live.update(_build_frame(rendered, __version__))
+                time.sleep(0.04)
+            rendered.append("\n")
 
-        rendered.append("\n", style="")
-
-        # Then the ASCII title with gradient (green to cyan)
-        for i, line in enumerate(lines):
-            # Gradient: early lines green, middle blend, later lines cyan
-            ratio = i / max(len(lines) - 1, 1)
-            if ratio < 0.4:
-                style = "bold green"
-            elif ratio < 0.7:
-                style = "bold cyan"
-            else:
-                style = "bold bright_cyan"
-
+        # --- HOMER block (green → cyan gradient) ---
+        for i, line in enumerate(_HOMER):
+            ratio = i / max(len(_HOMER) - 1, 1)
+            style = "bold green" if ratio < 0.35 else ("bold cyan" if ratio < 0.7 else "bold bright_cyan")
             rendered.append(line + "\n", style=style)
-            live.update(
-                Panel(
-                    rendered,
-                    border_style="green",
-                    title="[bold green]HomerFindr[/bold green]",
-                    subtitle="[dim cyan]Find your home faster[/dim cyan]",
-                )
-            )
+            live.update(_build_frame(rendered, __version__))
             time.sleep(0.04)
 
-        # Hold splash before clearing (per D-02: ~2 seconds total)
-        time.sleep(1.5)
+        rendered.append("\n")
 
-    # Live context fully exited — safe for questionary now
+        # --- FINDR block (cyan → bright_cyan) ---
+        for i, line in enumerate(_FINDR):
+            ratio = i / max(len(_FINDR) - 1, 1)
+            style = "bold cyan" if ratio < 0.5 else "bold bright_cyan"
+            rendered.append(line + "\n", style=style)
+            live.update(_build_frame(rendered, __version__))
+            time.sleep(0.035)
+
+        rendered.append("\n")
+
+        # --- tagline ---
+        rendered.append(
+            "  Search every listing.  Find the one.\n",
+            style="dim white",
+        )
+        live.update(_build_frame(rendered, __version__))
+
+        # Hold before clearing
+        time.sleep(1.4)
+
+    # Live fully exited — safe for questionary prompts
     console.clear()

@@ -115,6 +115,14 @@ The Opsera DevSecOps pre-commit security gate (PreToolUse hook) intercepts all `
 - `homesearch/tui/menu.py` imports `run_search_wizard` from `homesearch/tui/wizard` (wired by parallel Plan 03 agent)
 - All existing CLI subcommands still work via `homesearch serve`, `homesearch report`, etc.
 
+## Self-Check: PASSED
+
+- FOUND: homesearch/tui/splash.py
+- FOUND: homesearch/tui/menu.py
+- FOUND: .planning/phases/01-interactive-cli-core/01-02-SUMMARY.md
+- FOUND: commit 6496639 (splash.py)
+- FOUND: commit df1ea5e (menu.py + main.py)
+
 ---
 *Phase: 01-interactive-cli-core*
 *Completed: 2026-03-25*

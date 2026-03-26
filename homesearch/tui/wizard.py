@@ -60,11 +60,11 @@ _SQFT_MAP = {
 }
 
 _LOT_MAP = {
-    "Under 5,000 sqft  · city lot, ~1 tennis court":           (None, 5_000),
-    "5,000 - 10,000 sqft  · suburban lot, ~2 tennis courts":   (5_000, 10_000),
-    "10,000 - 20,000 sqft  · ¼ acre, ~3 school buses long":    (10_000, 20_000),
-    "Over 20,000 sqft  · ½ acre+, ~½ football field":          (20_000, 43_560),
-    "Over 1 acre  · full acre+, bigger than a football field":  (43_560, None),
+    "Under 5,000 sqft  · urban/condo only, rare in suburbs":    (None, 5_000),
+    "5,000 - 10,000 sqft  · typical suburb (Long Island, NJ)":  (5_000, 10_000),
+    "10,000 - 20,000 sqft  · ¼ acre, most US suburbs":          (10_000, 20_000),
+    "Over 20,000 sqft  · ½ acre+, larger suburban/rural":       (20_000, 43_560),
+    "Over 1 acre  · full acre+, rural/estate":                   (43_560, None),
 }
 
 
@@ -172,7 +172,9 @@ def _display_summary(criteria: SearchCriteria) -> None:
     add("Radius", f"{criteria.radius_miles} miles")
 
     if criteria.zip_codes:
-        table.add_row("ZIP codes", f"{len(criteria.zip_codes)} selected")
+        shown = ", ".join(criteria.zip_codes[:10])
+        suffix = f"  +{len(criteria.zip_codes) - 10} more" if len(criteria.zip_codes) > 10 else ""
+        table.add_row(f"ZIP codes ({len(criteria.zip_codes)})", shown + suffix)
     if criteria.excluded_zips:
         table.add_row("Excluded ZIPs", ", ".join(criteria.excluded_zips))
 
@@ -313,18 +315,18 @@ def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
         "Mediterranean": "mediterranean", "Farmhouse": "farmhouse",
     }
     _STYLE_CHOICES = [
-        questionary.Choice("Cape Cod      · steep roof, dormers, symmetrical facade", value="Cape Cod"),
-        questionary.Choice("Ranch         · single-story, open floor plan, low pitch", value="Ranch"),
-        questionary.Choice("Colonial      · 2-story, symmetrical, shuttered windows", value="Colonial"),
-        questionary.Choice("Split Level   · staggered floors, garage on lower level", value="Split Level"),
-        questionary.Choice("Raised Ranch  · ranch elevated above a partial basement", value="Raised Ranch"),
-        questionary.Choice("Contemporary  · clean lines, large windows, open plan", value="Contemporary"),
-        questionary.Choice("Victorian     · ornate trim, turrets, wrap-around porch", value="Victorian"),
-        questionary.Choice("Craftsman     · wide porch, tapered columns, natural wood", value="Craftsman"),
-        questionary.Choice("Bi-Level      · two floors entered from a mid-level foyer", value="Bi-Level"),
-        questionary.Choice("Tudor         · steep roof, half-timbering, arched doors", value="Tudor"),
-        questionary.Choice("Mediterranean · stucco exterior, red tile roof, arched windows", value="Mediterranean"),
-        questionary.Choice("Farmhouse     · large porch, board & batten, metal roof", value="Farmhouse"),
+        questionary.Choice("Cape Cod      · ~1,200–2,000 sqft · steep roof, dormers, symmetrical", value="Cape Cod"),
+        questionary.Choice("Ranch         · ~1,000–2,000 sqft · single-story, open floor plan", value="Ranch"),
+        questionary.Choice("Colonial      · ~2,000–3,500 sqft · 2-story, symmetrical, shuttered windows", value="Colonial"),
+        questionary.Choice("Split Level   · ~1,400–2,400 sqft · staggered floors, garage on lower level", value="Split Level"),
+        questionary.Choice("Raised Ranch  · ~1,200–1,800 sqft · ranch elevated above a partial basement", value="Raised Ranch"),
+        questionary.Choice("Contemporary  · ~2,000–4,000 sqft · clean lines, large windows, open plan", value="Contemporary"),
+        questionary.Choice("Victorian     · ~2,500–4,500 sqft · ornate trim, turrets, wrap-around porch", value="Victorian"),
+        questionary.Choice("Craftsman     · ~1,500–2,500 sqft · wide porch, tapered columns, natural wood", value="Craftsman"),
+        questionary.Choice("Bi-Level      · ~1,400–2,200 sqft · two floors entered from a mid-level foyer", value="Bi-Level"),
+        questionary.Choice("Tudor         · ~2,500–5,000 sqft · steep roof, half-timbering, arched doors", value="Tudor"),
+        questionary.Choice("Mediterranean · ~3,000–6,000 sqft · stucco exterior, red tile roof, arched windows", value="Mediterranean"),
+        questionary.Choice("Farmhouse     · ~2,000–3,500 sqft · large porch, board & batten, metal roof", value="Farmhouse"),
     ]
 
     def _step_property_type(s):
@@ -554,49 +556,153 @@ def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
             step_idx += 1
 
     # ------------------------------------------------------------------
-    # Build criteria from accumulated state
+    # Build criteria helper (called each loop iteration)
     # ------------------------------------------------------------------
-    criteria = SearchCriteria(
-        location=state.get("location", ""),
-        radius_miles=state.get("radius_miles", 25),
-        zip_codes=state.get("zip_codes", []),
-        excluded_zips=state.get("excluded_zips", []),
-        listing_type=state.get("listing_type", ListingType.SALE),
-        listing_types=state.get("listing_types", [ListingType.SALE]),
-        property_types=state.get("property_types", []),
-        house_styles=state.get("house_styles", []),
-        price_min=state.get("price_min"),
-        price_max=state.get("price_max"),
-        bedrooms_min=state.get("bedrooms_min"),
-        bathrooms_min=state.get("bathrooms_min"),
-        sqft_min=state.get("sqft_min"),
-        sqft_max=state.get("sqft_max"),
-        lot_sqft_min=state.get("lot_sqft_min"),
-        lot_sqft_max=state.get("lot_sqft_max"),
-        year_built_min=state.get("year_built_min"),
-        stories_min=state.get("stories_min"),
-        has_basement=state.get("has_basement"),
-        has_garage=state.get("has_garage"),
-        garage_spaces_min=state.get("garage_spaces_min"),
-        hoa_max=state.get("hoa_max"),
-        has_fireplace=state.get("has_fireplace"),
-        has_ac=state.get("has_ac"),
-        heat_type=state.get("heat_type"),
-        has_pool=state.get("has_pool"),
-    )
+    def _build_criteria():
+        return SearchCriteria(
+            location=state.get("location", ""),
+            radius_miles=state.get("radius_miles", 25),
+            zip_codes=state.get("zip_codes", []),
+            excluded_zips=state.get("excluded_zips", []),
+            listing_type=state.get("listing_type", ListingType.SALE),
+            listing_types=state.get("listing_types", [ListingType.SALE]),
+            property_types=state.get("property_types", []),
+            house_styles=state.get("house_styles", []),
+            price_min=state.get("price_min"),
+            price_max=state.get("price_max"),
+            bedrooms_min=state.get("bedrooms_min"),
+            bathrooms_min=state.get("bathrooms_min"),
+            sqft_min=state.get("sqft_min"),
+            sqft_max=state.get("sqft_max"),
+            lot_sqft_min=state.get("lot_sqft_min"),
+            lot_sqft_max=state.get("lot_sqft_max"),
+            year_built_min=state.get("year_built_min"),
+            stories_min=state.get("stories_min"),
+            has_basement=state.get("has_basement"),
+            has_garage=state.get("has_garage"),
+            garage_spaces_min=state.get("garage_spaces_min"),
+            hoa_max=state.get("hoa_max"),
+            has_fireplace=state.get("has_fireplace"),
+            has_ac=state.get("has_ac"),
+            heat_type=state.get("heat_type"),
+            has_pool=state.get("has_pool"),
+        )
+
+    # Human-readable label for each step index
+    _STEP_NAMES = [
+        "Listing type", "Property type & style", "Search radius",
+        "Search mode", "Location & ZIPs", "Price range", "Bedrooms",
+        "Bathrooms", "Square footage", "Lot size", "Year built", "Stories",
+        "Basement", "Garage", "Fireplace", "Air Conditioning", "Heat type",
+        "Pool", "HOA",
+    ]
+
+    def _describe_step(idx: int) -> str:
+        """Return a short string showing the current value for step idx."""
+        s = state
+        if idx == 0:
+            lts = s.get("listing_types", [])
+            return ", ".join(lt.value for lt in lts) if lts else "For Sale"
+        if idx == 1:
+            pa = s.get("prop_answer", "Any")
+            hs = s.get("house_styles", [])
+            suffix = f"  ({', '.join(h.replace('_', ' ').title() for h in hs)})" if hs else ""
+            return pa + suffix
+        if idx == 2:
+            return f"{s.get('radius_miles', 25)} miles"
+        if idx == 3:
+            return s.get("search_mode", "Single area")
+        if idx == 4:
+            loc = s.get("location", "")
+            zips = s.get("zip_codes", [])
+            return f"{loc}  ({len(zips)} ZIPs)" if zips else loc or "—"
+        if idx == 5:
+            lo, hi = s.get("price_min"), s.get("price_max")
+            if lo is None and hi is None:
+                return "Any"
+            return f"{'$' + f'{lo:,.0f}' if lo else 'Any'} – {'$' + f'{hi:,.0f}' if hi else 'Any'}"
+        if idx == 6:
+            v = s.get("bedrooms_min")
+            return f"{v}+" if v else "Any"
+        if idx == 7:
+            v = s.get("bathrooms_min")
+            return f"{v}+" if v else "Any"
+        if idx == 8:
+            lo, hi = s.get("sqft_min"), s.get("sqft_max")
+            if lo is None and hi is None:
+                return "Any"
+            return f"{f'{lo:,}' if lo else 'Any'} – {f'{hi:,}' if hi else 'Any'} sqft"
+        if idx == 9:
+            lo, hi = s.get("lot_sqft_min"), s.get("lot_sqft_max")
+            if lo is None and hi is None:
+                return "Any"
+            return f"{f'{lo:,}' if lo else 'Any'} – {f'{hi:,}' if hi else 'Any'} sqft"
+        if idx == 10:
+            v = s.get("year_built_min")
+            return f"{v}+" if v else "Any"
+        if idx == 11:
+            v = s.get("stories_min")
+            return f"{v}+" if v else "Any"
+        if idx == 12:
+            v = s.get("has_basement")
+            return "Must have" if v is True else ("No basement" if v is False else "Don't care")
+        if idx == 13:
+            v = s.get("has_garage")
+            gs = s.get("garage_spaces_min")
+            base = "Must have" if v is True else ("No garage" if v is False else "Don't care")
+            return f"{base}  ({gs}+ spaces)" if gs and v is True else base
+        if idx == 14:
+            v = s.get("has_fireplace")
+            return "Must have" if v is True else ("No fireplace" if v is False else "Don't care")
+        if idx == 15:
+            v = s.get("has_ac")
+            return "Must have" if v is True else ("No AC" if v is False else "Don't care")
+        if idx == 16:
+            v = s.get("heat_type")
+            return v.title() if v else "Don't care"
+        if idx == 17:
+            v = s.get("has_pool")
+            return "Must have" if v is True else ("No pool" if v is False else "Don't care")
+        if idx == 18:
+            v = s.get("hoa_max")
+            if v is None:
+                return "Any"
+            return "No HOA ($0)" if v == 0 else f"Up to ${v:.0f}/mo"
+        return ""
 
     # ------------------------------------------------------------------
-    # Summary + confirm
+    # Summary + confirm loop with targeted field editing
     # ------------------------------------------------------------------
-    _display_summary(criteria)
+    while True:
+        criteria = _build_criteria()
+        _display_summary(criteria)
 
-    confirm_answer = questionary.select(
-        "Search now?",
-        choices=["Yes", "Edit (restart)", "Cancel"],
-        style=HOUSE_STYLE,
-    ).ask()
-    if confirm_answer is None or confirm_answer == "Cancel":
-        return (criteria, "cancel")
-    if confirm_answer == "Edit (restart)":
-        return (criteria, "edit")
-    return (criteria, "yes")
+        confirm_answer = questionary.select(
+            "Search now?",
+            choices=["Yes, search!", "Edit a filter...", "Cancel"],
+            style=HOUSE_STYLE,
+        ).ask()
+
+        if confirm_answer is None or confirm_answer == "Cancel":
+            return (criteria, "cancel")
+        if confirm_answer == "Yes, search!":
+            return (criteria, "yes")
+
+        # Build picker list — all steps with current values
+        edit_choices = [
+            questionary.Choice(f"{name:<22}  {_describe_step(i)}", value=i)
+            for i, name in enumerate(_STEP_NAMES)
+        ] + [questionary.Choice("← Back", value=-1)]
+
+        which = questionary.select(
+            "Which filter would you like to change?",
+            choices=edit_choices,
+            style=HOUSE_STYLE,
+        ).ask()
+
+        if which is None or which == -1:
+            continue
+
+        result = steps[which](state)
+        if result is not None and result != _BACK:
+            state.update(result)

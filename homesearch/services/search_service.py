@@ -305,10 +305,10 @@ def _passes_filters(listing: Listing, criteria: SearchCriteria) -> bool:
     if criteria.hoa_max is not None and listing.hoa_monthly and listing.hoa_monthly > criteria.hoa_max:
         return False
 
-    if criteria.has_fireplace is True and listing.has_fireplace is not True:
+    if criteria.has_fireplace is True and listing.has_fireplace is False:
         return False
 
-    if criteria.has_ac is True and listing.has_ac is not True:
+    if criteria.has_ac is True and listing.has_ac is False:
         return False
     if criteria.has_ac is False and listing.has_ac is True:
         return False
@@ -317,7 +317,7 @@ def _passes_filters(listing: Listing, criteria: SearchCriteria) -> bool:
         if listing.heat_type and listing.heat_type != criteria.heat_type:
             return False
 
-    if criteria.has_pool is True and listing.has_pool is not True:
+    if criteria.has_pool is True and listing.has_pool is False:
         return False
     if criteria.has_pool is False and listing.has_pool is True:
         return False

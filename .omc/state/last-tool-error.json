@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"uv run python - << 'EOF'\\nimport json\\nfrom homesearch.models import SearchCriteria, ListingType\\nfrom homesearch.services.search_service import _passes_filters\\n\\n# Load criteria from sav...",
+  "error": "Exit code 1\n   Building homesearch @ file:///Users/iamtron/Documents/GitHub/HomerFindr\n      Built homesearch @ file:///Users/iamtron/Documents/GitHub/HomerFindr\nUninstalled 1 package in 2ms\nInstalled 1 package in 1ms\nTraceback (most recent call last):\n  File \"<stdin>\", line 28, in <module>\n  File \"/Users/iamtron/Documents/GitHub/HomerFindr/.venv/lib/python3.11/site-packages/pydantic/main.py\", line 250, in __init__\n    validated_self = self.__pydantic_validator__.validate_python(data, self_insta...",
+  "timestamp": "2026-03-26T19:01:16.445Z",
+  "retry_count": 1
+}

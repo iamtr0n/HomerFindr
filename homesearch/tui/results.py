@@ -248,13 +248,13 @@ def _ask_new_search() -> bool:
     return pick and "New search" in pick
 
 
-def _diagnose_filters(raw: list[Listing], criteria: SearchCriteria) -> list[tuple[str, int]]:
-    """For each active filter, count how many raw listings it eliminates. Returns sorted list."""
+def _diagnose_filters(raw: list[Listing], criteria: SearchCriteria) -> list[tuple[str, int, str]]:
+    """For each active filter, count how many raw listings it eliminates. Returns sorted list of (label, count, recommendation)."""
     total = len(raw)
     if not total:
         return []
 
-    hits: list[tuple[str, int]] = []
+    hits: list[tuple[str, int, str]] = []
 
     def _elim(pred) -> int:
         return sum(1 for l in raw if pred(l))
@@ -262,83 +262,113 @@ def _diagnose_filters(raw: list[Listing], criteria: SearchCriteria) -> list[tupl
     if criteria.price_min is not None:
         n = _elim(lambda l: l.price is not None and l.price < criteria.price_min)
         if n:
-            hits.append((f"Price min ${criteria.price_min:,.0f}", n))
+            prices = sorted(l.price for l in raw if l.price is not None)
+            suggested = int(prices[0] * 0.95) if prices else None
+            rec = f"Try lowering price min to ${suggested:,}" if suggested else "Try removing the price minimum"
+            hits.append((f"Price min ${criteria.price_min:,.0f}", n, rec))
 
     if criteria.price_max is not None:
         n = _elim(lambda l: l.price is not None and l.price > criteria.price_max)
         if n:
-            hits.append((f"Price max ${criteria.price_max:,.0f}", n))
+            over = sorted(l.price for l in raw if l.price is not None and l.price > criteria.price_max)
+            suggested = int(over[len(over) // 2]) if over else None
+            rec = f"Try raising price max to ${suggested:,}" if suggested else "Try raising the price maximum"
+            hits.append((f"Price max ${criteria.price_max:,.0f}", n, rec))
 
     if criteria.bedrooms_min:
         n = _elim(lambda l: l.bedrooms is not None and l.bedrooms < criteria.bedrooms_min)
         if n:
-            hits.append((f"Beds ≥ {criteria.bedrooms_min}", n))
+            suggested = criteria.bedrooms_min - 1
+            rec = f"Try lowering beds to {suggested}+" if suggested > 0 else "Try removing the bed requirement"
+            hits.append((f"Beds ≥ {criteria.bedrooms_min}", n, rec))
 
     if criteria.bathrooms_min:
         n = _elim(lambda l: l.bathrooms is not None and l.bathrooms < criteria.bathrooms_min)
         if n:
-            hits.append((f"Baths ≥ {criteria.bathrooms_min}", n))
+            suggested = criteria.bathrooms_min - (0.5 if criteria.bathrooms_min > 1 else 1)
+            rec = f"Try lowering baths to {suggested}+" if suggested > 0 else "Try removing the bath requirement"
+            hits.append((f"Baths ≥ {criteria.bathrooms_min}", n, rec))
 
     if criteria.sqft_min:
         n = _elim(lambda l: l.sqft is not None and l.sqft < criteria.sqft_min)
         if n:
-            hits.append((f"Sqft ≥ {criteria.sqft_min:,}", n))
+            sqfts = sorted(l.sqft for l in raw if l.sqft is not None)
+            suggested = int(sqfts[len(sqfts) // 2]) if sqfts else None
+            rec = f"Try lowering sqft to {suggested:,}" if suggested else "Try lowering the sqft minimum"
+            hits.append((f"Sqft ≥ {criteria.sqft_min:,}", n, rec))
 
     if criteria.sqft_max:
         n = _elim(lambda l: l.sqft is not None and l.sqft > criteria.sqft_max)
         if n:
-            hits.append((f"Sqft ≤ {criteria.sqft_max:,}", n))
+            hits.append((f"Sqft ≤ {criteria.sqft_max:,}", n, "Try raising the sqft maximum"))
 
     if criteria.lot_sqft_min:
         n = _elim(lambda l: l.lot_sqft is not None and l.lot_sqft < criteria.lot_sqft_min)
         if n:
-            hits.append((f"Lot ≥ {criteria.lot_sqft_min:,} sqft", n))
+            hits.append((f"Lot ≥ {criteria.lot_sqft_min:,} sqft", n, "Try lowering the lot size minimum"))
+
+    if criteria.lot_sqft_max:
+        n = _elim(lambda l: l.lot_sqft is not None and l.lot_sqft > criteria.lot_sqft_max)
+        if n:
+            lots = sorted(l.lot_sqft for l in raw if l.lot_sqft is not None)
+            suggested = int(lots[len(lots) // 2]) if lots else None
+            rec = f"Try raising lot max to {suggested:,} sqft" if suggested else "Try raising the lot size maximum"
+            hits.append((f"Lot ≤ {criteria.lot_sqft_max:,} sqft", n, rec))
+
+    if criteria.stories_min and criteria.stories_min > 1:
+        n = _elim(lambda l: l.stories is not None and l.stories < criteria.stories_min)
+        if n:
+            hits.append((f"Stories ≥ {criteria.stories_min}", n, "Try lowering to 1+ stories or Any"))
 
     if criteria.year_built_min:
         n = _elim(lambda l: l.year_built is not None and l.year_built < criteria.year_built_min)
         if n:
-            hits.append((f"Built ≥ {criteria.year_built_min}", n))
+            suggested = criteria.year_built_min - 5
+            hits.append((f"Built ≥ {criteria.year_built_min}", n, f"Try lowering year built to {suggested}"))
 
     if criteria.has_basement is True:
         n = _elim(lambda l: l.has_basement is False)
         if n:
-            hits.append(("Has basement", n))
+            hits.append(("Has basement", n, "Remove the basement requirement"))
 
     if criteria.has_garage is True:
         n = _elim(lambda l: l.has_garage is False)
         if n:
-            hits.append(("Has garage", n))
+            hits.append(("Has garage", n, "Remove the garage requirement"))
 
     if criteria.has_fireplace is True:
         n = _elim(lambda l: l.has_fireplace is not True)
         if n:
-            hits.append(("Has fireplace", n))
+            hits.append(("Has fireplace", n, "Remove the fireplace requirement"))
 
     if criteria.has_pool is True:
         n = _elim(lambda l: l.has_pool is not True)
         if n:
-            hits.append(("Has pool", n))
+            hits.append(("Has pool", n, "Remove the pool requirement"))
 
     if criteria.has_ac is True:
         n = _elim(lambda l: l.has_ac is not True)
         if n:
-            hits.append(("Has A/C", n))
+            hits.append(("Has A/C", n, "Remove the A/C requirement"))
 
     if criteria.hoa_max is not None:
         n = _elim(lambda l: l.hoa_monthly is not None and l.hoa_monthly > criteria.hoa_max)
         if n:
-            hits.append((f"HOA ≤ ${criteria.hoa_max:.0f}/mo", n))
+            over = sorted(l.hoa_monthly for l in raw if l.hoa_monthly is not None and l.hoa_monthly > criteria.hoa_max)
+            suggested = int(over[0]) if over else None
+            rec = f"Try raising HOA max to ${suggested}/mo" if suggested else "Try raising the HOA maximum"
+            hits.append((f"HOA ≤ ${criteria.hoa_max:.0f}/mo", n, rec))
 
     if criteria.property_types:
         pt_vals = [pt.value for pt in criteria.property_types]
         n = _elim(lambda l: l.property_type not in pt_vals)
         if n:
-            hits.append(("Property type", n))
+            hits.append(("Property type", n, "Add more property types to your search"))
 
     if criteria.house_styles:
         n = _elim(lambda l: l.house_style is not None and not any(s in l.house_style for s in criteria.house_styles))
         if n:
-            hits.append(("House style", n))
+            hits.append(("House style", n, "Add more house styles or remove the style filter"))
 
     hits.sort(key=lambda x: -x[1])
     return hits
@@ -355,12 +385,17 @@ def _show_no_results(criteria: SearchCriteria, pre_filter_count: int, raw_listin
             if diagnosis:
                 console.print("[bold]Filters eliminating the most listings:[/bold]")
                 bar_w = 20
-                for label, count in diagnosis[:6]:
+                for i, (label, count, rec) in enumerate(diagnosis[:6]):
                     pct = int(100 * count / pre_filter_count)
                     filled = max(1, pct * bar_w // 100) if pct > 0 else 0
                     bar = "█" * filled + "░" * (bar_w - filled)
-                    console.print(f"  [cyan]{label:<22}[/cyan]  [{bar}] {count}/{pre_filter_count} eliminated")
-        console.print("[dim]\nTry relaxing the filters shown above for more results.[/dim]")
+                    if i == 0:
+                        console.print(f"  [bold red]{label:<22}[/bold red]  [{bar}] {count}/{pre_filter_count} eliminated")
+                        console.print(f"    [red]↳ {rec}[/red]")
+                    else:
+                        console.print(f"  [yellow]{label:<22}[/yellow]  [{bar}] {count}/{pre_filter_count} eliminated")
+                        console.print(f"    [dim]↳ {rec}[/dim]")
+        console.print('\n[dim]Use "Edit a filter" at the search prompt to adjust any of these.[/dim]')
     else:
         console.print("[yellow]No properties found matching your criteria.[/yellow]")
         console.print("[dim]Try a different location or broader search area.[/dim]")

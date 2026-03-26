@@ -1,0 +1,457 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1774535243360,
+  "projectRoot": "/Users/iamtron/Documents/GitHub/HomerFindr",
+  "techStack": {
+    "languages": [
+      {
+        "name": "Python",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "pyproject.toml"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "fastapi",
+        "version": null,
+        "category": "backend"
+      },
+      {
+        "name": "pytest",
+        "version": null,
+        "category": "testing"
+      }
+    ],
+    "packageManager": null,
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": "pytest",
+    "lintCommand": "ruff check",
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "tests"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "frontend": {
+      "path": "frontend",
+      "purpose": null,
+      "fileCount": 6,
+      "lastAccessed": 1774535243343,
+      "keyFiles": [
+        "index.html",
+        "package-lock.json",
+        "package.json",
+        "postcss.config.js",
+        "tailwind.config.js"
+      ]
+    },
+    "homesearch": {
+      "path": "homesearch",
+      "purpose": null,
+      "fileCount": 5,
+      "lastAccessed": 1774535243343,
+      "keyFiles": [
+        "__init__.py",
+        "config.py",
+        "database.py",
+        "main.py",
+        "models.py"
+      ]
+    },
+    "homesearch.egg-info": {
+      "path": "homesearch.egg-info",
+      "purpose": null,
+      "fileCount": 6,
+      "lastAccessed": 1774535243344,
+      "keyFiles": [
+        "PKG-INFO",
+        "SOURCES.txt",
+        "dependency_links.txt",
+        "entry_points.txt",
+        "requires.txt"
+      ]
+    },
+    "packaging": {
+      "path": "packaging",
+      "purpose": null,
+      "fileCount": 3,
+      "lastAccessed": 1774535243344,
+      "keyFiles": [
+        "HomerFindr.command",
+        "README.md",
+        "homerfindr_launcher.sh"
+      ]
+    },
+    "tests": {
+      "path": "tests",
+      "purpose": "Test files",
+      "fileCount": 2,
+      "lastAccessed": 1774535243344,
+      "keyFiles": [
+        "__init__.py",
+        "test_web_launcher.py"
+      ]
+    },
+    "frontend/dist": {
+      "path": "frontend/dist",
+      "purpose": "Distribution/build output",
+      "fileCount": 1,
+      "lastAccessed": 1774535243345,
+      "keyFiles": [
+        "index.html"
+      ]
+    },
+    "frontend/node_modules": {
+      "path": "frontend/node_modules",
+      "purpose": "Dependencies",
+      "fileCount": 1,
+      "lastAccessed": 1774535243346,
+      "keyFiles": []
+    },
+    "frontend/src": {
+      "path": "frontend/src",
+      "purpose": "Source code",
+      "fileCount": 4,
+      "lastAccessed": 1774535243346,
+      "keyFiles": [
+        "App.jsx",
+        "api.js",
+        "index.css"
+      ]
+    },
+    "homesearch/api": {
+      "path": "homesearch/api",
+      "purpose": "API routes",
+      "fileCount": 2,
+      "lastAccessed": 1774535243346,
+      "keyFiles": [
+        "__init__.py",
+        "routes.py"
+      ]
+    },
+    "homesearch/services": {
+      "path": "homesearch/services",
+      "purpose": "Business logic services",
+      "fileCount": 5,
+      "lastAccessed": 1774535243347,
+      "keyFiles": [
+        "__init__.py",
+        "report_service.py",
+        "scheduler_service.py"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "homesearch/tui/wizard.py",
+      "accessCount": 51,
+      "lastAccessed": 1774552020687,
+      "type": "file"
+    },
+    {
+      "path": ".planning/STATE.md",
+      "accessCount": 43,
+      "lastAccessed": 1774547504308,
+      "type": "file"
+    },
+    {
+      "path": "homesearch/services/search_service.py",
+      "accessCount": 30,
+      "lastAccessed": 1774551118336,
+      "type": "directory"
+    },
+    {
+      "path": "homesearch/models.py",
+      "accessCount": 24,
+      "lastAccessed": 1774551005347,
+      "type": "file"
+    },
+    {
+      "path": "frontend/src/components/SearchForm.jsx",
+      "accessCount": 23,
+      "lastAccessed": 1774540502879,
+      "type": "file"
+    },
+    {
+      "path": "homesearch/providers/homeharvest_provider.py",
+      "accessCount": 22,
+      "lastAccessed": 1774551073960,
+      "type": "file"
+    },
+    {
+      "path": "homesearch/tui/results.py",
+      "accessCount": 22,
+      "lastAccessed": 1774551717802,
+      "type": "file"
+    },
+    {
+      "path": "frontend/src/pages/NewSearch.jsx",
+      "accessCount": 16,
+      "lastAccessed": 1774540551613,
+      "type": "file"
+    },
+    {
+      "path": "homesearch/api/routes.py",
+      "accessCount": 14,
+      "lastAccessed": 1774539908024,
+      "type": "file"
+    },
+    {
+      "path": "CLAUDE.md",
+      "accessCount": 14,
+      "lastAccessed": 1774547121913,
+      "type": "file"
+    },
+    {
+      "path": "frontend/src/api.js",
+      "accessCount": 11,
+      "lastAccessed": 1774539908999,
+      "type": "file"
+    },
+    {
+      "path": "homesearch/main.py",
+      "accessCount": 11,
+      "lastAccessed": 1774548341353,
+      "type": "directory"
+    },
+    {
+      "path": "frontend/src/components/PropertyCard.jsx",
+      "accessCount": 10,
+      "lastAccessed": 1774540519369,
+      "type": "file"
+    },
+    {
+      "path": "homesearch/services/zip_service.py",
+      "accessCount": 10,
+      "lastAccessed": 1774547055776,
+      "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 9,
+      "lastAccessed": 1774548277185,
+      "type": "directory"
+    },
+    {
+      "path": "homesearch/database.py",
+      "accessCount": 8,
+      "lastAccessed": 1774536528470,
+      "type": "file"
+    },
+    {
+      "path": "homesearch/services/scheduler_service.py",
+      "accessCount": 8,
+      "lastAccessed": 1774537280628,
+      "type": "file"
+    },
+    {
+      "path": "install.sh",
+      "accessCount": 7,
+      "lastAccessed": 1774541306466,
+      "type": "file"
+    },
+    {
+      "path": "frontend/src/pages/Dashboard.jsx",
+      "accessCount": 5,
+      "lastAccessed": 1774536631179,
+      "type": "file"
+    },
+    {
+      "path": "pyproject.toml",
+      "accessCount": 5,
+      "lastAccessed": 1774551130421,
+      "type": "file"
+    },
+    {
+      "path": "homesearch/tui/menu.py",
+      "accessCount": 4,
+      "lastAccessed": 1774551146741,
+      "type": "file"
+    },
+    {
+      "path": ".planning/quick/260326-ghj-cli-multi-city-zip-search-tool-with-spac/260326-ghj-SUMMARY.md",
+      "accessCount": 3,
+      "lastAccessed": 1774540799099,
+      "type": "file"
+    },
+    {
+      "path": "homesearch/tui/zip_browser.py",
+      "accessCount": 3,
+      "lastAccessed": 1774544732843,
+      "type": "file"
+    },
+    {
+      "path": "homesearch/providers/redfin_provider.py",
+      "accessCount": 3,
+      "lastAccessed": 1774546220697,
+      "type": "directory"
+    },
+    {
+      "path": ".planning/quick/260326-ejq-fix-web-search-sse-streaming-endpoint-li/260326-ejq-PLAN.md",
+      "accessCount": 2,
+      "lastAccessed": 1774535485273,
+      "type": "file"
+    },
+    {
+      "path": ".planning/quick/260326-erx-location-autocomplete-state-aware-disamb/260326-erx-PLAN.md",
+      "accessCount": 2,
+      "lastAccessed": 1774536117940,
+      "type": "file"
+    },
+    {
+      "path": ".planning/quick/260326-ery-zapier-webhook-sms-notifications-per-sea/260326-ery-PLAN.md",
+      "accessCount": 2,
+      "lastAccessed": 1774536467004,
+      "type": "file"
+    },
+    {
+      "path": ".planning/quick/260326-ery-zapier-webhook-sms-notifications-per-sea/260326-ery-SUMMARY.md",
+      "accessCount": 2,
+      "lastAccessed": 1774536705054,
+      "type": "file"
+    },
+    {
+      "path": "homesearch/config.py",
+      "accessCount": 2,
+      "lastAccessed": 1774537252455,
+      "type": "file"
+    },
+    {
+      "path": ".planning/quick/260326-gal-scoring-engine-match-badges-gold-star-so/260326-gal-PLAN.md",
+      "accessCount": 2,
+      "lastAccessed": 1774540066375,
+      "type": "file"
+    },
+    {
+      "path": ".planning/quick/260326-gam-highway-proximity-detection-school-ratin/260326-gam-PLAN.md",
+      "accessCount": 2,
+      "lastAccessed": 1774540379777,
+      "type": "file"
+    },
+    {
+      "path": ".planning/quick/260326-ghj-cli-multi-city-zip-search-tool-with-spac/260326-ghj-PLAN.md",
+      "accessCount": 2,
+      "lastAccessed": 1774540659485,
+      "type": "file"
+    },
+    {
+      "path": "homesearch",
+      "accessCount": 2,
+      "lastAccessed": 1774545620341,
+      "type": "directory"
+    },
+    {
+      "path": ".planning/quick/260326-j1t-fix-coming-soon-invalidlistingtype-error/260326-j1t-PLAN.md",
+      "accessCount": 2,
+      "lastAccessed": 1774547120986,
+      "type": "file"
+    },
+    {
+      "path": "homesearch/tui/saved_browser.py",
+      "accessCount": 2,
+      "lastAccessed": 1774548331214,
+      "type": "file"
+    },
+    {
+      "path": "homesearch/__init__.py",
+      "accessCount": 2,
+      "lastAccessed": 1774550908046,
+      "type": "file"
+    },
+    {
+      "path": "homesearch/tui/splash.py",
+      "accessCount": 2,
+      "lastAccessed": 1774550930178,
+      "type": "file"
+    },
+    {
+      "path": ".planning/quick/260326-ejq-fix-web-search-sse-streaming-endpoint-li/260326-ejq-SUMMARY.md",
+      "accessCount": 1,
+      "lastAccessed": 1774535671506,
+      "type": "file"
+    },
+    {
+      "path": ".planning/quick/260326-erx-location-autocomplete-state-aware-disamb/260326-erx-SUMMARY.md",
+      "accessCount": 1,
+      "lastAccessed": 1774536389366,
+      "type": "file"
+    },
+    {
+      "path": ".env.example",
+      "accessCount": 1,
+      "lastAccessed": 1774537247089,
+      "type": "file"
+    },
+    {
+      "path": ".planning/quick/260326-gal-scoring-engine-match-badges-gold-star-so/260326-gal-SUMMARY.md",
+      "accessCount": 1,
+      "lastAccessed": 1774540288029,
+      "type": "file"
+    },
+    {
+      "path": "homesearch/services/road_service.py",
+      "accessCount": 1,
+      "lastAccessed": 1774540416506,
+      "type": "file"
+    },
+    {
+      "path": "homesearch/services/school_service.py",
+      "accessCount": 1,
+      "lastAccessed": 1774540420532,
+      "type": "file"
+    },
+    {
+      "path": ".planning/quick/260326-gam-highway-proximity-detection-school-ratin/260326-gam-SUMMARY.md",
+      "accessCount": 1,
+      "lastAccessed": 1774540601470,
+      "type": "file"
+    },
+    {
+      "path": "homesearch/tui/styles.py",
+      "accessCount": 1,
+      "lastAccessed": 1774540665263,
+      "type": "file"
+    },
+    {
+      "path": "homebrew-formula/homerfindr.rb",
+      "accessCount": 1,
+      "lastAccessed": 1774541537788,
+      "type": "file"
+    },
+    {
+      "path": ".planning/quick/260326-j1t-fix-coming-soon-invalidlistingtype-error/260326-j1t-SUMMARY.md",
+      "accessCount": 1,
+      "lastAccessed": 1774547192379,
+      "type": "file"
+    },
+    {
+      "path": "homesearch/services/update_service.py",
+      "accessCount": 1,
+      "lastAccessed": 1774550914059,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

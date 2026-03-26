@@ -119,6 +119,15 @@ None — no external service configuration required.
 - All 15 field parsers tested and verified correct
 - No blockers for Plan 04
 
+## Self-Check: PASSED
+
+- homesearch/tui/wizard.py: FOUND (482 lines, committed in caf7917)
+- homesearch/tui/menu.py: FOUND (wizard wired, committed in df1ea5e)
+- .planning/phases/01-interactive-cli-core/01-03-SUMMARY.md: FOUND
+- commit caf7917: FOUND
+- commit df1ea5e: FOUND
+- commit 7bd8ebe: FOUND (docs metadata)
+
 ---
 *Phase: 01-interactive-cli-core*
 *Completed: 2026-03-25*

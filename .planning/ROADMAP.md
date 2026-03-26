@@ -37,10 +37,10 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
   1. User runs a search and sees photo thumbnails on property cards in the web dashboard for listings that have photos
   2. Listing photo loads without a 403 error — no blocked images in DevTools Network tab
   3. Property cards for listings without photos show a styled placeholder (Home icon) instead of a broken image or grey rectangle
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 05-01: Diagnose photo pipeline and apply referrerPolicy fix + placeholder polish
+- [ ] 05-01-PLAN.md — Diagnose photo pipeline, fix CDN hotlink blocking, add alt_photos fallback, polish placeholder
 
 ### Phase 6: CLI Progress Bar Polish
 **Goal**: Users see a rich.progress.Progress bar with percentage and provider label during CLI search — no more static braille spinner
@@ -77,6 +77,6 @@ Plans:
 | 2. CLI Settings and Configuration | v1.0 | 3/3 | Complete | 2026-03-25 |
 | 3. Web UI Redesign | v1.0 | 4/4 | Complete | 2026-03-25 |
 | 4. Bridge and Desktop Packaging | v1.0 | 2/2 | Complete | 2026-03-26 |
-| 5. Property Card Photos | v1.1 | 0/? | Not started | - |
+| 5. Property Card Photos | v1.1 | 0/1 | Planning complete | - |
 | 6. CLI Progress Bar Polish | v1.1 | 0/? | Not started | - |
 | 7. End-to-End Verification | v1.1 | 0/? | Not started | - |

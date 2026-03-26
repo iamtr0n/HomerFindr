@@ -110,3 +110,108 @@ echo ""
 if command -v open &>/dev/null; then
   open http://127.0.0.1:8000
 fi
+
+# ─────────────────────────────────────────────
+# SMS ALERT SETUP (optional, free via Zapier)
+# ─────────────────────────────────────────────
+echo ""
+echo "  ─────────────────────────────────────────"
+echo "  📱  Want SMS alerts when new homes hit?"
+echo "     Free Zapier account — takes 3 minutes."
+echo "  ─────────────────────────────────────────"
+echo ""
+read -p "  Set up SMS alerts now? (y/n): " SETUP_SMS
+echo ""
+
+if [[ "$SETUP_SMS" =~ ^[Yy]$ ]]; then
+
+  read -p "  Your phone number (e.g. +12125551234): " PHONE_NUMBER
+  echo ""
+
+  # Generate a unique webhook URL placeholder they'll fill in after Zapier
+  echo -e "  ${BLUE}Step 1 — Create a free Zapier account${NC}"
+  echo "  ➜ Go to: https://zapier.com/sign-up  (free, no credit card)"
+  echo ""
+  echo -e "  ${BLUE}Step 2 — Create a new Zap${NC}"
+  echo "  ➜ Click \"Create\" → \"New Zap\""
+  echo ""
+  echo -e "  ${BLUE}Step 3 — Paste this into Zapier's AI prompt box${NC}"
+  echo ""
+  echo "  ┌─────────────────────────────────────────────────────────────────┐"
+  echo "  │  Copy everything between the lines:                            │"
+  echo "  ├─────────────────────────────────────────────────────────────────┤"
+  cat << ZAPIER_PROMPT
+
+  Create a Zap with these exact settings:
+
+  TRIGGER:
+  - App: Webhooks by Zapier
+  - Event: Catch Hook
+  - (Copy the webhook URL it generates — you will need it in a moment)
+
+  ACTION:
+  - App: SMS by Zapier
+  - Event: Send SMS
+  - To: ${PHONE_NUMBER}
+  - Message:
+    🏠 HomerFindr Alert
+    {{new_count}} new home(s) for "{{search_name}}"
+
+    📍 {{listings__1__address}}
+    💰 \${{listings__1__price}}
+    🛏 {{listings__1__beds}} bed / {{listings__1__baths}} bath
+    📐 {{listings__1__sqft}} sqft
+    🔗 {{listings__1__url}}
+
+    Open HomerFindr: http://127.0.0.1:8000
+
+  Turn the Zap ON when done.
+
+ZAPIER_PROMPT
+  echo "  └─────────────────────────────────────────────────────────────────┘"
+  echo ""
+  echo -e "  ${BLUE}Step 4 — Paste your webhook URL here${NC}"
+  echo "  (After Zapier generates your Catch Hook URL, paste it below)"
+  echo ""
+  read -p "  Zapier webhook URL: " WEBHOOK_URL
+  echo ""
+
+  if [[ -n "$WEBHOOK_URL" ]]; then
+    # Write to .env
+    if grep -q "ZAPIER_WEBHOOK_URL" "$INSTALL_DIR/.env" 2>/dev/null; then
+      sed -i '' "s|ZAPIER_WEBHOOK_URL=.*|ZAPIER_WEBHOOK_URL=$WEBHOOK_URL|" "$INSTALL_DIR/.env"
+    else
+      echo "" >> "$INSTALL_DIR/.env"
+      echo "# Zapier webhook for SMS alerts" >> "$INSTALL_DIR/.env"
+      echo "ZAPIER_WEBHOOK_URL=$WEBHOOK_URL" >> "$INSTALL_DIR/.env"
+    fi
+
+    # Restart server to pick up new .env
+    launchctl unload "$PLIST" 2>/dev/null || true
+    sleep 1
+    launchctl load "$PLIST"
+
+    # Send a test notification
+    sleep 3
+    curl -s -X POST "$WEBHOOK_URL" \
+      -H "Content-Type: application/json" \
+      -d "{\"search_name\":\"Test Alert\",\"new_count\":1,\"listings\":[{\"address\":\"123 Main St, Anytown USA\",\"price\":450000,\"beds\":3,\"baths\":2,\"sqft\":1800,\"url\":\"http://127.0.0.1:8000\"}]}" \
+      > /dev/null
+
+    echo -e "  ${GREEN}✓ Webhook saved and test alert sent!${NC}"
+    echo "  Check your phone — you should receive a test SMS within 30 seconds."
+    echo ""
+    echo "  You're all set. Every saved search will now text you when new homes hit."
+  else
+    echo "  Skipped — you can add it later by editing: $INSTALL_DIR/.env"
+    echo "  Add this line:  ZAPIER_WEBHOOK_URL=https://hooks.zapier.com/..."
+  fi
+
+else
+  echo "  Skipped. You can set up SMS alerts anytime by editing:"
+  echo "  $INSTALL_DIR/.env  →  add:  ZAPIER_WEBHOOK_URL=https://hooks.zapier.com/..."
+  echo ""
+fi
+
+echo -e "  ${GREEN}HomerFindr setup complete. Happy house hunting! 🏠${NC}"
+echo ""

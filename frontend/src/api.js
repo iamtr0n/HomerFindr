@@ -36,6 +36,12 @@ export const api = {
   discoverZips: (location, radius = 25) =>
     request(`/zips/discover?location=${encodeURIComponent(location)}&radius=${radius}`),
 
+  // Notification settings
+  updateNotifications: (id, settings) => request(`/searches/${id}/notifications`, {
+    method: 'PUT',
+    body: JSON.stringify(settings),
+  }),
+
   // Reports
   generateReport: () => request('/report/generate', { method: 'POST' }),
   sendReport: () => request('/report/send', { method: 'POST' }),

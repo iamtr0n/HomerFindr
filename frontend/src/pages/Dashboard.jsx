@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { api } from '../api'
-import { Play, Trash2, Clock, MapPin, DollarSign, Loader2, Mail, Search, Home, TrendingUp } from 'lucide-react'
+import { Play, Trash2, Clock, MapPin, DollarSign, Loader2, Mail, Search, Home, TrendingUp, Bell, Save } from 'lucide-react'
 import { Card, CardHeader, CardContent } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
@@ -37,6 +37,17 @@ export default function Dashboard() {
   const totalSearches = searches.length
   const totalProperties = searches.reduce((sum, s) => sum + (s.result_count || 0), 0)
   const activeSearches = searches.filter(s => s.is_active).length
+
+  const [alertsOpen, setAlertsOpen] = useState(null) // search ID or null
+  const [alertForm, setAlertForm] = useState({ desktop: true, zapier_webhook: '', notify_coming_soon_only: false })
+
+  const notifMutation = useMutation({
+    mutationFn: ({ id, settings }) => api.updateNotifications(id, settings),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['searches'] })
+      setAlertsOpen(null)
+    },
+  })
 
   const runMutation = useMutation({
     mutationFn: (id) => api.runSearch(id),
@@ -186,12 +197,83 @@ export default function Dashboard() {
                       variant="ghost"
                       size="icon"
                       onClick={() => {
+                        if (alertsOpen === s.id) {
+                          setAlertsOpen(null)
+                        } else {
+                          setAlertForm({
+                            desktop: s.notification_settings?.desktop ?? true,
+                            zapier_webhook: s.notification_settings?.zapier_webhook ?? '',
+                            notify_coming_soon_only: s.notification_settings?.notify_coming_soon_only ?? false,
+                          })
+                          setAlertsOpen(s.id)
+                        }
+                      }}
+                    >
+                      <Bell size={16} className={s.notification_settings?.zapier_webhook ? 'text-brand-600' : 'text-slate-400'} />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
                         if (confirm(`Delete "${s.name}"?`)) deleteMutation.mutate(s.id)
                       }}
                     >
                       <Trash2 size={16} className="text-red-500" />
                     </Button>
                   </div>
+
+                  {/* Alerts settings panel */}
+                  {alertsOpen === s.id && (
+                    <div className="mt-3 pt-3 border-t border-slate-100 space-y-3">
+                      <p className="text-sm font-medium text-slate-700">Alert Settings</p>
+
+                      {/* Desktop toggle */}
+                      <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={alertForm.desktop}
+                          onChange={(e) => setAlertForm(f => ({ ...f, desktop: e.target.checked }))}
+                          className="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                        />
+                        Desktop notifications
+                      </label>
+
+                      {/* Zapier webhook URL */}
+                      <div>
+                        <label className="block text-sm text-slate-600 mb-1">Zapier Webhook URL</label>
+                        <input
+                          type="url"
+                          value={alertForm.zapier_webhook}
+                          onChange={(e) => setAlertForm(f => ({ ...f, zapier_webhook: e.target.value }))}
+                          placeholder="https://hooks.zapier.com/hooks/catch/..."
+                          className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+                        />
+                      </div>
+
+                      {/* Coming Soon only toggle */}
+                      <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={alertForm.notify_coming_soon_only}
+                          onChange={(e) => setAlertForm(f => ({ ...f, notify_coming_soon_only: e.target.checked }))}
+                          className="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                        />
+                        Coming Soon listings only
+                      </label>
+
+                      {/* Save button */}
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => notifMutation.mutate({ id: s.id, settings: alertForm })}
+                        disabled={notifMutation.isPending}
+                      >
+                        {notifMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                        Save Alert Settings
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )

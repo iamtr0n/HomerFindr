@@ -65,6 +65,9 @@ class SearchCriteria(BaseModel):
     heat_type: Optional[str] = None  # "any", "gas", "electric", "radiant", None
     has_pool: Optional[bool] = None
 
+    avoid_highways: bool = False
+    school_rating_min: Optional[int] = None  # 1-10
+
 
 class Listing(BaseModel):
     """A normalized property listing from any source."""
@@ -91,6 +94,10 @@ class Listing(BaseModel):
     has_ac: Optional[bool] = None
     heat_type: Optional[str] = None  # Detected: "gas", "electric", "radiant", "forced air", etc.
     has_pool: Optional[bool] = None
+    near_highway: bool = False
+    highway_name: str = ""
+    school_rating: Optional[int] = None  # 1-10
+    school_district: str = ""
     year_built: Optional[int] = None
     hoa_monthly: Optional[float] = None
     latitude: Optional[float] = None

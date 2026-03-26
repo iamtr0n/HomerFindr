@@ -150,6 +150,10 @@ class HomeHarvestProvider(BaseProvider):
                 heat_type = "forced air"
             has_pool = True if ("pool" in desc and "pool table" not in desc and "carpool" not in desc) else None
 
+            # School data extraction
+            from homesearch.services.school_service import get_school_rating_from_row
+            school_rating, school_district = get_school_rating_from_row(row)
+
             # Property type mapping
             ptype = str(row.get("style", "") or row.get("property_type", "") or "").lower()
             property_type = "single_family"
@@ -192,6 +196,8 @@ class HomeHarvestProvider(BaseProvider):
                 has_ac=has_ac,
                 heat_type=heat_type,
                 has_pool=has_pool,
+                school_rating=school_rating,
+                school_district=school_district,
                 year_built=year_built,
                 hoa_monthly=hoa,
                 latitude=lat,

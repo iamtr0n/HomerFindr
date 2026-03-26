@@ -11,6 +11,7 @@ from homesearch.providers.homeharvest_provider import HomeHarvestProvider
 from homesearch.providers.redfin_provider import RedfinProvider
 from homesearch.services.zip_service import discover_zip_codes
 from homesearch import database as db
+from homesearch.services.road_service import check_highway_proximity
 
 
 def get_providers() -> list[BaseProvider]:
@@ -87,8 +88,19 @@ def run_search(
     if pre_filter_counts is not None:
         pre_filter_counts.append(len(deduped))
 
+    # Note: school enrichment would go here if a school API were available.
+    # Currently school_rating is extracted at the provider level from row data.
+
     # Apply client-side filters for fields not supported by all providers
     filtered = [l for l in deduped if _passes_filters(l, criteria)]
+
+    # Enrich: highway proximity (only when user opted in AND listing has coords)
+    if criteria.avoid_highways:
+        for listing in filtered:
+            if listing.latitude and listing.longitude:
+                near, name = check_highway_proximity(listing.latitude, listing.longitude)
+                listing.near_highway = near
+                listing.highway_name = name
 
     # Score and sort results
     perfect = _perfect_score(criteria)
@@ -98,11 +110,19 @@ def run_search(
         listing.match_badges = badges
         listing.is_gold_star = score >= perfect and perfect > 0
 
-    filtered.sort(key=lambda l: (
-        -(1 if l.is_gold_star else 0),
-        -l.match_score,
-        l.price or float('inf'),
-    ))
+    if criteria.avoid_highways:
+        filtered.sort(key=lambda l: (
+            l.near_highway,
+            -(1 if l.is_gold_star else 0),
+            -l.match_score,
+            l.price or float('inf'),
+        ))
+    else:
+        filtered.sort(key=lambda l: (
+            -(1 if l.is_gold_star else 0),
+            -l.match_score,
+            l.price or float('inf'),
+        ))
 
     # If search_id provided, persist results
     if search_id is not None:
@@ -297,6 +317,10 @@ def _passes_filters(listing: Listing, criteria: SearchCriteria) -> bool:
     if criteria.property_types:
         if listing.property_type not in [pt.value for pt in criteria.property_types]:
             return False
+
+    # School rating minimum
+    if criteria.school_rating_min and listing.school_rating and listing.school_rating < criteria.school_rating_min:
+        return False
 
     # ZIP exclusion
     if criteria.excluded_zips and listing.zip_code in criteria.excluded_zips:

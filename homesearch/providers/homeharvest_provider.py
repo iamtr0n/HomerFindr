@@ -105,6 +105,10 @@ class HomeHarvestProvider(BaseProvider):
             lat = _safe_float(row.get("latitude"))
             lon = _safe_float(row.get("longitude"))
             photo = str(row.get("primary_photo", "") or row.get("img_src", "") or "")
+            if not photo:
+                alt = str(row.get("alt_photos", "") or "")
+                if alt:
+                    photo = alt.split(", ")[0]
 
             # Garage / basement detection from description
             desc = str(row.get("description", "") or row.get("text", "") or "").lower()

@@ -1,4 +1,5 @@
-import { ExternalLink, Bed, Bath, Ruler, Calendar } from 'lucide-react'
+import { useState } from 'react'
+import { ExternalLink, Bed, Bath, Ruler, Calendar, Home } from 'lucide-react'
 import { Card, CardContent } from './ui/Card'
 import { Badge } from './ui/Badge'
 import { Button } from './ui/Button'
@@ -9,6 +10,9 @@ export default function PropertyCard({ listing }) {
     has_garage, has_basement, stories, hoa_monthly, photo_url, source_url,
     source, zip_code, property_type,
   } = listing
+
+  const [imgLoaded, setImgLoaded] = useState(false)
+  const placeholderClass = `w-full h-52 bg-slate-100 flex flex-col items-center justify-center text-slate-400 gap-2${photo_url && !imgLoaded ? ' animate-pulse' : ''}`
 
   const priceStr = price ? `$${price.toLocaleString()}` : 'Price N/A'
 
@@ -30,11 +34,21 @@ export default function PropertyCard({ listing }) {
             src={photo_url}
             alt={address}
             className="w-full h-52 object-cover bg-slate-100"
-            onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }}
+            referrerPolicy="no-referrer"
+            onLoad={() => setImgLoaded(true)}
+            onError={(e) => {
+              e.target.style.display = 'none'
+              e.target.nextSibling.style.display = 'flex'
+              setImgLoaded(true)
+            }}
           />
         ) : null}
-        <div className={`w-full h-52 bg-slate-100 items-center justify-center text-slate-400 text-sm ${photo_url ? 'hidden' : 'flex'}`}>
-          No Photo Available
+        <div
+          className={placeholderClass}
+          style={photo_url && imgLoaded ? { display: 'none' } : undefined}
+        >
+          <Home size={28} />
+          <span className="text-xs">No Photo Available</span>
         </div>
         <Badge variant="secondary" className="absolute top-2 right-2 capitalize shadow-sm">
           {source}

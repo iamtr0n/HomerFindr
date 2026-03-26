@@ -45,11 +45,11 @@
 
 ### Desktop & Packaging
 
-- [ ] **PKG-01**: Global `homerfindr` CLI command installable via pipx (works from anywhere in terminal)
-- [ ] **PKG-02**: Launch Web UI from CLI — starts FastAPI server as daemon thread + opens browser
-- [ ] **PKG-03**: macOS .app shortcut for Dock (via Platypus or .command wrapper)
-- [ ] **PKG-04**: Graceful server shutdown when CLI exits
-- [ ] **PKG-05**: Port collision handling (fallback to next available port)
+- [x] **PKG-01**: Global `homerfindr` CLI command installable via pipx (works from anywhere in terminal)
+- [x] **PKG-02**: Launch Web UI from CLI — starts FastAPI server as daemon thread + opens browser
+- [x] **PKG-03**: macOS .app shortcut for Dock (via Platypus or .command wrapper)
+- [x] **PKG-04**: Graceful server shutdown when CLI exits
+- [x] **PKG-05**: Port collision handling (fallback to next available port)
 
 ### Cross-Cutting
 
@@ -112,11 +112,11 @@
 | WEB-04 | Phase 3 | Complete |
 | WEB-05 | Phase 3 | Complete |
 | WEB-06 | Phase 3 | Complete |
-| PKG-01 | Phase 4 | Pending |
-| PKG-02 | Phase 4 | Pending |
-| PKG-03 | Phase 4 | Pending |
-| PKG-04 | Phase 4 | Pending |
-| PKG-05 | Phase 4 | Pending |
+| PKG-01 | Phase 4 | Complete |
+| PKG-02 | Phase 4 | Complete |
+| PKG-03 | Phase 4 | Complete |
+| PKG-04 | Phase 4 | Complete |
+| PKG-05 | Phase 4 | Complete |
 | XC-01 | Phase 3 | Complete |
 | XC-02 | Phase 3 | Complete |
 | XC-03 | Phase 3 | Complete |

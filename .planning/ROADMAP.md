@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 1: Interactive CLI Core** - Arrow-key navigation, ASCII art splash, search wizard, and Rich results — the zero-typing CLI experience
 - [ ] **Phase 2: CLI Settings and Configuration** - Settings page, SMTP wizard, saved searches browser, first-run setup, and persistent config
 - [x] **Phase 3: Web UI Redesign** - Professional Zillow/Redfin-inspired dashboard with property cards, sortable results, and cross-cutting data quality fixes (completed 2026-03-25)
-- [ ] **Phase 4: Bridge and Desktop Packaging** - Launch Web UI from CLI, global homerfindr command, and macOS .app shortcut
+- [x] **Phase 4: Bridge and Desktop Packaging** - Launch Web UI from CLI, global homerfindr command, and macOS .app shortcut (completed 2026-03-26)
 
 ## Phase Details
 
@@ -80,11 +80,11 @@ Plans:
   2. Selecting "Launch Web UI" from the CLI main menu starts the FastAPI server and opens the browser automatically — no manual server start needed
   3. Closing the CLI (or selecting Exit) shuts down the background FastAPI server gracefully with no zombie processes
   4. A macOS .app bundle in the Dock opens a terminal running homerfindr when double-clicked
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 
 Plans:
-- [ ] 04-01-PLAN.md — Background web server manager (web_launcher.py), menu.py wiring for Launch Web UI + graceful shutdown (PKG-02, PKG-04, PKG-05)
-- [ ] 04-02-PLAN.md — pipx install validation, macOS .command launcher, Platypus wrapper script, packaging README (PKG-01, PKG-03)
+- [x] 04-01-PLAN.md — Background web server manager (web_launcher.py), menu.py wiring for Launch Web UI + graceful shutdown (PKG-02, PKG-04, PKG-05)
+- [x] 04-02-PLAN.md — pipx install validation, macOS .command launcher, Platypus wrapper script, packaging README (PKG-01, PKG-03)
 
 ## Progress
 
@@ -98,4 +98,4 @@ Note: Phase 3 is independent of Phase 2 and can be worked in parallel with Phase
 | 1. Interactive CLI Core | 4/4 | Complete |  |
 | 2. CLI Settings and Configuration | 1/3 | In Progress|  |
 | 3. Web UI Redesign | 4/4 | Complete   | 2026-03-25 |
-| 4. Bridge and Desktop Packaging | 0/2 | Not started | - |
+| 4. Bridge and Desktop Packaging | 2/2 | Complete   | 2026-03-26 |

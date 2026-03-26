@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 03-03-PLAN.md
-last_updated: "2026-03-25T23:57:32.914Z"
+stopped_at: Completed 04-01-PLAN.md
+last_updated: "2026-03-26T00:36:16.951Z"
 progress:
   total_phases: 4
-  completed_phases: 3
-  total_plans: 11
-  completed_plans: 11
+  completed_phases: 4
+  total_plans: 13
+  completed_plans: 13
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Find homes fast across all platforms without juggling multiple websites — zero typing required in the CLI
-**Current focus:** Phase 03 — web-ui-redesign
+**Current focus:** Phase 04 — Bridge and Desktop Packaging
 
 ## Current Position
 
-Phase: 4
-Plan: Not started
+Phase: 04 (Bridge and Desktop Packaging) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -56,6 +56,8 @@ Plan: Not started
 | Phase 03-web-ui-redesign P02 | 3 | 2 tasks | 8 files |
 | Phase 03-web-ui-redesign P04 | 5 | 2 tasks | 2 files |
 | Phase 03-web-ui-redesign P03 | 10 | 2 tasks | 1 files |
+| Phase 04 P02 | 2 | 2 tasks | 4 files |
+| Phase 04-bridge-and-desktop-packaging P01 | 25 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -84,6 +86,11 @@ Recent decisions affecting current work:
 - [Phase 03-web-ui-redesign]: Forest-green brand palette (brand-50 through brand-900) replaces generic blue in nav and UI components
 - [Phase 03-web-ui-redesign]: filteredAndSorted() combines client-side filtering and sorting in SearchResults — no extra API calls on filter change
 - [Phase 03-web-ui-redesign]: Amber banner (amber-50/200/700/800) used for provider error display — visually distinct from brand green
+- [Phase 04]: Use .command file as primary macOS launcher (zero dependency, works on any Mac)
+- [Phase 04]: Platypus .app build is developer-optional; documented in README but not auto-built
+- [Phase Phase 04]: BackgroundServer subclass polls server.started before opening browser — prevents 502 connection refused on first launch
+- [Phase Phase 04]: uvicorn log_level=error suppresses startup INFO logs that corrupt Rich terminal output
+- [Phase Phase 04]: atexit.register(stop_server) belt-and-suspenders with explicit _cleanup_server() — daemon=True alone insufficient for clean SQLite shutdown
 
 ### Pending Todos
 
@@ -97,6 +104,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T23:54:16.729Z
-Stopped at: Completed 03-03-PLAN.md
+Last session: 2026-03-26T00:36:16.950Z
+Stopped at: Completed 04-01-PLAN.md
 Resume file: None

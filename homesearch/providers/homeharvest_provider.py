@@ -68,15 +68,19 @@ class HomeHarvestProvider(BaseProvider):
     def _row_to_listing(self, row, listing_type: str) -> Listing | None:
         """Convert a homeharvest DataFrame row to our Listing model."""
         try:
+            import pandas as pd
+            # Normalize: replace all pandas NA values with None for safe Python operations
+            row = {k: (None if (v is not None and _is_na(v)) else v) for k, v in row.items()}
+
             address_parts = []
             for col in ["street", "street_address"]:
-                if col in row and row.get(col):
+                if row.get(col):
                     address_parts.append(str(row[col]))
                     break
 
-            city = str(row.get("city", "")) if row.get("city") else ""
-            state = str(row.get("state", "")) if row.get("state") else ""
-            zip_code = str(row.get("zip_code", "")) if row.get("zip_code") else ""
+            city = str(row.get("city") or "")
+            state = str(row.get("state") or "")
+            zip_code = str(row.get("zip_code") or "")
 
             if not address_parts and not city:
                 return None
@@ -94,29 +98,29 @@ class HomeHarvestProvider(BaseProvider):
             source_id = str(mls_id) if mls_id else source_url or address
 
             # Property details
-            price = _safe_float(row.get("list_price") or row.get("price") or row.get("sold_price"))
-            beds = _safe_int(row.get("beds") or row.get("bedrooms"))
-            baths = _safe_float(row.get("baths") or row.get("bathrooms") or row.get("full_baths"))
-            sqft = _safe_int(row.get("sqft") or row.get("square_feet"))
+            price = _safe_float(_coalesce(row.get("list_price"), row.get("price"), row.get("sold_price")))
+            beds = _safe_int(_coalesce(row.get("beds"), row.get("bedrooms")))
+            baths = _safe_float(_coalesce(row.get("baths"), row.get("bathrooms"), row.get("full_baths")))
+            sqft = _safe_int(_coalesce(row.get("sqft"), row.get("square_feet")))
             lot_sqft = _safe_int(row.get("lot_sqft"))
             year_built = _safe_int(row.get("year_built"))
             stories = _safe_int(row.get("stories"))
             hoa = _safe_float(row.get("hoa_fee"))
             lat = _safe_float(row.get("latitude"))
             lon = _safe_float(row.get("longitude"))
-            photo = str(row.get("primary_photo", "") or row.get("img_src", "") or "")
+            photo = str(_coalesce(row.get("primary_photo"), row.get("img_src")) or "")
             if not photo:
-                alt = str(row.get("alt_photos", "") or "")
+                alt = str(_coalesce(row.get("alt_photos")) or "")
                 if alt:
                     photo = alt.split(", ")[0]
 
             # Garage / basement detection from description
-            desc = str(row.get("description", "") or row.get("text", "") or "").lower()
+            desc = str(_coalesce(row.get("description"), row.get("text")) or "").lower()
             has_garage = None
             has_basement = None
             garage_spaces = None
             try:
-                _pg = bool(row.get("parking_garage") or False)
+                _pg = bool(_coalesce(row.get("parking_garage")) or False)
             except (TypeError, ValueError):
                 _pg = False
             if _pg or "garage" in desc:
@@ -174,11 +178,36 @@ class HomeHarvestProvider(BaseProvider):
             return None
 
 
+def _is_na(val) -> bool:
+    """Safely check if a value is pandas NA / NaN without raising TypeError."""
+    try:
+        import pandas as pd
+        return bool(pd.isna(val))
+    except (TypeError, ValueError):
+        return False
+
+
+def _coalesce(*vals):
+    """Return first value that is not None and not pandas NA."""
+    import pandas as pd
+    for v in vals:
+        try:
+            if v is not None and not pd.isna(v):
+                return v
+        except (TypeError, ValueError):
+            if v is not None:
+                return v
+    return None
+
+
 def _safe_float(val) -> float | None:
     if val is None:
         return None
     try:
         import math
+        import pandas as pd
+        if pd.isna(val):
+            return None
         f = float(val)
         return f if not math.isnan(f) else None
     except (ValueError, TypeError):

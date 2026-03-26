@@ -8,6 +8,16 @@ A polished home search aggregator that pulls listings from multiple platforms (R
 
 Find homes fast across all platforms without juggling multiple websites — zero typing required in the CLI, just arrows and Enter.
 
+## Current Milestone: v1.1 Polish & Verification
+
+**Goal:** Verify all v1.0 features end-to-end, fix any bugs found, and ship the three known v1.1 improvements.
+
+**Target features:**
+- End-to-end install and feature verification (CLI, web UI, saved searches, email)
+- Property card thumbnail photos — real listing images in web dashboard
+- Settings/Saved Searches menu wiring — verify and fix Phase 2 integration gaps
+- CLI animation polish — progress bars and richer loading states
+
 ## Current State
 
 **Shipped: v1.0 MVP** (2026-03-26) — 4 phases, 13 plans, ~4,800 LOC (Python + React)
@@ -17,11 +27,6 @@ Find homes fast across all platforms without juggling multiple websites — zero
 - ✅ Zillow/Redfin-inspired web dashboard with shadcn/ui design system
 - ✅ `pipx install .` → `homerfindr` global command; "Launch Web UI" opens browser from CLI
 - ✅ macOS double-click `.command` launcher and Platypus Dock wrapper
-
-**Known gaps for v1.1:**
-- Phase 2 Plan 3 (menu.py wiring for Settings/Saved Searches) needs verification
-- Property card thumbnails not yet fetching real listing photos
-- CLI color/animation polish (progress bars, animated loading) partially complete
 
 ## Requirements
 
@@ -48,11 +53,12 @@ Find homes fast across all platforms without juggling multiple websites — zero
 - ✓ Sortable/filterable search results — client-side price/beds/baths filters — v1.0
 - ✓ Provider error banners — visible when Realtor.com or Redfin returns 403/error — v1.0
 
-### Active (v1.1 candidates)
+### Active (v1.1)
 
-- [ ] Property card thumbnail photos — fetch real listing images
-- [ ] Phase 2 settings/saved-searches wiring — full verification of menu integration
-- [ ] CLI animation polish — progress bars, richer loading states
+- [ ] End-to-end install and feature verification — confirm full v1.0 feature set works on a clean machine
+- [ ] Property card thumbnail photos — fetch real listing images in web dashboard cards
+- [ ] Settings/Saved Searches menu wiring — full verification and fix of Phase 2 menu integration
+- [ ] CLI animation polish — progress bars, richer loading states during search
 
 ### Out of Scope
 
@@ -85,5 +91,22 @@ Find homes fast across all platforms without juggling multiple websites — zero
 - **Local-first**: Everything runs on the user's machine, no cloud dependencies
 - **Zero typing**: Search wizard must be navigable entirely with arrows + Enter
 
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition** (via `/gsd:transition`):
+1. Requirements invalidated? → Move to Out of Scope with reason
+2. Requirements validated? → Move to Validated with phase reference
+3. New requirements emerged? → Add to Active
+4. Decisions to log? → Add to Key Decisions
+5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone** (via `/gsd:complete-milestone`):
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
+
 ---
-*Last updated: 2026-03-26 after v1.0 milestone*
+*Last updated: 2026-03-25 after v1.1 milestone start*

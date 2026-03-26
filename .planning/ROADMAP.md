@@ -80,7 +80,11 @@ Plans:
   2. Selecting "Launch Web UI" from the CLI main menu starts the FastAPI server and opens the browser automatically — no manual server start needed
   3. Closing the CLI (or selecting Exit) shuts down the background FastAPI server gracefully with no zombie processes
   4. A macOS .app bundle in the Dock opens a terminal running homerfindr when double-clicked
-**Plans**: TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 04-01-PLAN.md — Background web server manager (web_launcher.py), menu.py wiring for Launch Web UI + graceful shutdown (PKG-02, PKG-04, PKG-05)
+- [ ] 04-02-PLAN.md — pipx install validation, macOS .command launcher, Platypus wrapper script, packaging README (PKG-01, PKG-03)
 
 ## Progress
 
@@ -94,4 +98,4 @@ Note: Phase 3 is independent of Phase 2 and can be worked in parallel with Phase
 | 1. Interactive CLI Core | 4/4 | Complete |  |
 | 2. CLI Settings and Configuration | 1/3 | In Progress|  |
 | 3. Web UI Redesign | 4/4 | Complete   | 2026-03-25 |
-| 4. Bridge and Desktop Packaging | 0/TBD | Not started | - |
+| 4. Bridge and Desktop Packaging | 0/2 | Not started | - |

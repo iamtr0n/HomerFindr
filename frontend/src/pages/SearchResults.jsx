@@ -10,7 +10,7 @@ export default function SearchResults() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [showNewOnly, setShowNewOnly] = useState(false)
-  const [sortBy, setSortBy] = useState('price_asc')
+  const [sortBy, setSortBy] = useState('match_score')
   const [filterMinPrice, setFilterMinPrice] = useState('')
   const [filterMaxPrice, setFilterMaxPrice] = useState('')
   const [filterMinBeds, setFilterMinBeds] = useState('')
@@ -48,6 +48,11 @@ export default function SearchResults() {
     if (filterMinBaths) list = list.filter(l => (l.bathrooms || 0) >= +filterMinBaths)
     // Apply sort
     switch (sortBy) {
+      case 'match_score': return list.sort((a, b) => {
+        const scoreDiff = (b.match_score || 0) - (a.match_score || 0)
+        if (scoreDiff !== 0) return scoreDiff
+        return (b.is_gold_star ? 1 : 0) - (a.is_gold_star ? 1 : 0)
+      })
       case 'price_asc': return list.sort((a, b) => (a.price || 0) - (b.price || 0))
       case 'price_desc': return list.sort((a, b) => (b.price || 0) - (a.price || 0))
       case 'sqft_desc': return list.sort((a, b) => (b.sqft || 0) - (a.sqft || 0))
@@ -160,6 +165,7 @@ export default function SearchResults() {
           onChange={(e) => setSortBy(e.target.value)}
           className="ml-auto py-1.5 px-3 border border-slate-200 rounded-lg text-sm text-slate-600"
         >
+          <option value="match_score">Best Match</option>
           <option value="price_asc">Price: Low to High</option>
           <option value="price_desc">Price: High to Low</option>
           <option value="sqft_desc">Largest First</option>

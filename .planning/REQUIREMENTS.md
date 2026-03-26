@@ -7,8 +7,8 @@
 
 ### Photos
 
-- [ ] **PHOTO-01**: User can see real listing thumbnail photos in property cards on the web dashboard
-- [ ] **PHOTO-02**: Property cards display a polished placeholder when no listing photo is available
+- [x] **PHOTO-01**: User can see real listing thumbnail photos in property cards on the web dashboard
+- [x] **PHOTO-02**: Property cards display a polished placeholder when no listing photo is available
 
 ### CLI Polish
 
@@ -44,8 +44,8 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PHOTO-01 | Phase 5 | Pending |
-| PHOTO-02 | Phase 5 | Pending |
+| PHOTO-01 | Phase 5 | Complete |
+| PHOTO-02 | Phase 5 | Complete |
 | CLI-01 | Phase 6 | Pending |
 | CLI-02 | Phase 6 | Pending |
 | VERIFY-01 | Phase 7 | Pending |

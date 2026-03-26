@@ -23,7 +23,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
 **Milestone Goal:** Verify all v1.0 features end-to-end, fix edge cases found, and ship three targeted improvements — property card thumbnail photos, CLI search progress bars, and confirmed-working Settings/Saved Searches menu paths.
 
-- [ ] **Phase 5: Property Card Photos** - Real listing thumbnail images visible in web dashboard property cards
+- [x] **Phase 5: Property Card Photos** - Real listing thumbnail images visible in web dashboard property cards (completed 2026-03-26)
 - [ ] **Phase 6: CLI Progress Bar Polish** - Rich progress bar with provider label replaces hand-rolled spinner during search
 - [ ] **Phase 7: End-to-End Verification** - All v1.0 features verified and edge cases patched
 
@@ -40,7 +40,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 **Plans**: 1 plan
 
 Plans:
-- [ ] 05-01-PLAN.md — Diagnose photo pipeline, fix CDN hotlink blocking, add alt_photos fallback, polish placeholder
+- [x] 05-01-PLAN.md — Diagnose photo pipeline, fix CDN hotlink blocking, add alt_photos fallback, polish placeholder
 
 ### Phase 6: CLI Progress Bar Polish
 **Goal**: Users see a rich.progress.Progress bar with percentage and provider label during CLI search — no more static braille spinner
@@ -77,6 +77,6 @@ Plans:
 | 2. CLI Settings and Configuration | v1.0 | 3/3 | Complete | 2026-03-25 |
 | 3. Web UI Redesign | v1.0 | 4/4 | Complete | 2026-03-25 |
 | 4. Bridge and Desktop Packaging | v1.0 | 2/2 | Complete | 2026-03-26 |
-| 5. Property Card Photos | v1.1 | 0/1 | Planning complete | - |
+| 5. Property Card Photos | v1.1 | 1/1 | Complete   | 2026-03-26 |
 | 6. CLI Progress Bar Polish | v1.1 | 0/? | Not started | - |
 | 7. End-to-End Verification | v1.1 | 0/? | Not started | - |

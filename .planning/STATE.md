@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Polish & Verification
-status: roadmap_complete
-stopped_at: ~
-last_updated: "2026-03-25T00:00:00.000Z"
+status: unknown
+stopped_at: "05-01-PLAN.md checkpoint:human-verify at Task 3"
+last_updated: "2026-03-26T02:31:38.843Z"
 progress:
   total_phases: 3
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  completed_phases: 1
+  total_plans: 1
+  completed_plans: 1
 ---
 
 # Project State
@@ -19,16 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Find homes fast across all platforms without juggling multiple websites — zero typing required in the CLI
-**Current focus:** Milestone v1.1 — Phase 5: Property Card Photos (ready to plan)
+**Current focus:** Phase 05 — Property Card Photos
 
 ## Current Position
 
-Phase: 5 of 7 (Property Card Photos)
-Plan: — of — in current phase
-Status: Ready to plan
-Last activity: 2026-03-25 — v1.1 roadmap created (Phases 5-7)
-
-Progress: [░░░░░░░░░░] 0%
+Phase: 05 (Property Card Photos) — EXECUTING
+Plan: 1 of 1
 
 ## Performance Metrics
 
@@ -50,6 +46,7 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: —
 
 *Updated after each plan completion*
+| Phase 05 P01 | 3 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -63,6 +60,9 @@ Recent decisions affecting current work:
 - [v1.1 Research]: referrerPolicy="no-referrer" on img tag resolves CDN 403 for Realtor.com photos — no proxy needed
 - [v1.1 Research]: rich.progress.Progress (already installed) replaces hand-rolled braille spinner; single with Progress block, worker never touches progress object directly
 - [v1.1 Research]: All Settings/Saved Searches handler dispatch confirmed correct by code inspection — Phase 7 is runtime verification + edge-case patching
+- [Phase 05]: referrerPolicy=no-referrer confirmed as correct CDN bypass for rdcpix.com — no server-side proxy needed
+- [Phase 05]: alt_photos homeharvest column is a comma-joined string — must use .split(', ')[0] not list indexing
+- [Phase 05]: imgLoaded set to true in both onLoad and onError so animate-pulse stops in all terminal states
 
 ### Pending Todos
 
@@ -76,6 +76,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25
-Stopped at: v1.1 roadmap created — Phases 5, 6, 7 defined
+Last session: 2026-03-26T02:31:26.682Z
+Stopped at: 05-01-PLAN.md checkpoint:human-verify at Task 3
 Resume file: None

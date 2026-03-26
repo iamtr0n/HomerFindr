@@ -11,6 +11,7 @@ export default function NewSearch() {
   const [loading, setLoading] = useState(false)
   const [sortBy, setSortBy] = useState('best_match')
   const [visibleCount, setVisibleCount] = useState(50)
+  const [collapsedSections, setCollapsedSections] = useState({})
   const [providerErrors, setProviderErrors] = useState([])
   const [progress, setProgress] = useState(null) // { current, total, location }
 
@@ -41,6 +42,67 @@ export default function NewSearch() {
       setLoading(false)
       setProgress(null)
     }
+  }
+
+  const toggleSection = (key) => setCollapsedSections(prev => ({ ...prev, [key]: !prev[key] }))
+
+  const groupResults = (listings) => {
+    if (!listings || listings.length === 0) return []
+
+    const sections = [
+      {
+        key: 'perfect',
+        icon: '\u2B50',
+        title: 'Perfect Match',
+        color: 'bg-yellow-50 border-yellow-300 text-yellow-800',
+        headerColor: 'bg-yellow-100',
+        filter: (l) => l.is_gold_star && !l.near_highway,
+        defaultOpen: true,
+      },
+      {
+        key: 'strong',
+        icon: '\u2705',
+        title: 'Strong Match',
+        color: 'bg-green-50 border-green-300 text-green-800',
+        headerColor: 'bg-green-100',
+        filter: (l) => !l.near_highway && l.match_score >= 3,
+        defaultOpen: true,
+      },
+      {
+        key: 'good',
+        icon: '\uD83C\uDFE0',
+        title: 'Good Options',
+        color: 'bg-blue-50 border-blue-300 text-blue-800',
+        headerColor: 'bg-blue-100',
+        filter: (l) => !l.near_highway,
+        defaultOpen: false,
+      },
+      {
+        key: 'highway',
+        icon: '\u26A0\uFE0F',
+        title: 'Near Highway',
+        color: 'bg-amber-50 border-amber-300 text-amber-800',
+        headerColor: 'bg-amber-100',
+        filter: (l) => l.near_highway,
+        defaultOpen: false,
+      },
+    ]
+
+    // Assign each listing to the FIRST matching section (waterfall)
+    const assigned = new Set()
+    const grouped = sections.map(section => {
+      const items = listings.filter(l => {
+        if (assigned.has(l)) return false
+        if (section.filter(l)) {
+          assigned.add(l)
+          return true
+        }
+        return false
+      })
+      return { ...section, items }
+    }).filter(s => s.items.length > 0)
+
+    return grouped
   }
 
   const sortedResults = () => {
@@ -133,43 +195,37 @@ export default function NewSearch() {
 
           {results.total === 0 ? (
             <p className="text-center text-slate-500 py-8">No properties match your criteria. Try adjusting your filters.</p>
-          ) : (() => {
-            const sorted = sortedResults()
-            const perfectScore = Math.max(...sorted.map(r => r.match_score || 0), 0)
-            const goldStarCount = sorted.filter(r => (r.match_score || 0) >= perfectScore && perfectScore > 0).length
-            const visible = sorted.slice(0, visibleCount)
-            return (
-              <>
-                {goldStarCount > 0 && (
-                  <p className="text-sm font-medium text-amber-700 mb-3">
-                    ⭐ {goldStarCount} Perfect Match{goldStarCount !== 1 ? 'es' : ''}
-                  </p>
-                )}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {visible.map((listing, i) => {
-                    const isGoldStar = (listing.match_score || 0) >= perfectScore && perfectScore > 0
-                    return (
-                      <PropertyCard
-                        key={`${listing.source}-${listing.source_id}-${i}`}
-                        listing={listing}
-                        isGoldStar={isGoldStar}
-                      />
-                    )
-                  })}
-                </div>
-                {sorted.length > visibleCount && (
-                  <div className="text-center mt-6">
+          ) : (
+            <div className="space-y-6">
+              {groupResults(sortedResults()).map(section => {
+                const isCollapsed = collapsedSections[section.key] ?? !section.defaultOpen
+                return (
+                  <div key={section.key} className={`border rounded-lg overflow-hidden ${section.color}`}>
                     <button
-                      onClick={() => setVisibleCount(v => v + 50)}
-                      className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                      onClick={() => toggleSection(section.key)}
+                      className={`w-full flex items-center justify-between px-4 py-3 ${section.headerColor} font-semibold text-sm`}
                     >
-                      Showing {visibleCount} of {results.total} — Load 50 more
+                      <span>{section.icon} {section.title} ({section.items.length})</span>
+                      <span className="text-xs">{isCollapsed ? '+ Show' : '- Hide'}</span>
                     </button>
+                    {!isCollapsed && (
+                      <div className="p-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                          {section.items.map((listing, i) => (
+                            <PropertyCard
+                              key={`${listing.source}-${listing.source_id}-${i}`}
+                              listing={listing}
+                              isGoldStar={listing.is_gold_star}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </>
-            )
-          })()}
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>

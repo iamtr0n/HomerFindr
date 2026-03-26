@@ -8,7 +8,8 @@ export default function PropertyCard({ listing, isGoldStar = false }) {
   const {
     address, city, state, price, bedrooms, bathrooms, sqft, year_built,
     has_garage, has_basement, stories, hoa_monthly, photo_url, source_url,
-    source, zip_code, property_type, match_badges,
+    source, zip_code, property_type, match_badges, near_highway, highway_name,
+    school_rating, school_district,
   } = listing
 
   const [imgLoaded, setImgLoaded] = useState(false)
@@ -21,6 +22,7 @@ export default function PropertyCard({ listing, isGoldStar = false }) {
   if (has_basement) features.push('Basement')
   if (stories) features.push(`${stories} Floor${stories > 1 ? 's' : ''}`)
   if (hoa_monthly) features.push(`HOA $${hoa_monthly}/mo`)
+  if (school_rating) features.push(`School: ${school_rating}/10`)
 
   const locationStr = [city, state].filter(Boolean).join(', ')
   const fullLocation = [locationStr, zip_code].filter(Boolean).join(' ')
@@ -94,6 +96,13 @@ export default function PropertyCard({ listing, isGoldStar = false }) {
                 {badge}
               </span>
             ))}
+          </div>
+        )}
+
+        {/* Highway warning */}
+        {near_highway && (
+          <div className="flex items-center gap-1 text-amber-600 text-xs font-medium mb-2">
+            <span>&#9888;&#65039;</span> Near {highway_name || 'Highway'}
           </div>
         )}
 

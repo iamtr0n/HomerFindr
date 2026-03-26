@@ -47,6 +47,8 @@ export default function SearchForm({ onSearch, onLoading }) {
     hoa_max: '',
     excluded_zips: [],
     zip_codes: [],
+    avoid_highways: false,
+    school_rating_min: '',
   })
   const [zipResults, setZipResults] = useState([])
   const [zipLoading, setZipLoading] = useState(false)
@@ -98,7 +100,7 @@ export default function SearchForm({ onSearch, onLoading }) {
     // Convert empty strings to null for numeric fields
     for (const key of ['price_min', 'price_max', 'bedrooms_min', 'bathrooms_min',
       'sqft_min', 'sqft_max', 'lot_sqft_min', 'lot_sqft_max', 'year_built_min',
-      'year_built_max', 'stories_min', 'garage_spaces_min', 'hoa_max']) {
+      'year_built_max', 'stories_min', 'garage_spaces_min', 'hoa_max', 'school_rating_min']) {
       if (c[key] === '' || c[key] === undefined) c[key] = null
     }
     return c
@@ -388,6 +390,33 @@ export default function SearchForm({ onSearch, onLoading }) {
               <label className="block text-xs font-medium text-gray-600 mb-1">Min Garage Spaces</label>
               <input type="number" placeholder="Any" value={criteria.garage_spaces_min}
                 onChange={setNum('garage_spaces_min')} className="w-full py-1.5 px-3 border rounded text-sm" />
+            </div>
+          </div>
+
+          {/* Highway & School filters */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex items-center gap-2 pt-5">
+              <input
+                type="checkbox"
+                id="avoid_highways"
+                checked={criteria.avoid_highways || false}
+                onChange={(e) => setCriteria({ ...criteria, avoid_highways: e.target.checked })}
+                className="rounded border-gray-300"
+              />
+              <label htmlFor="avoid_highways" className="text-xs font-medium text-gray-600">
+                Avoid highways
+              </label>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Min School Rating</label>
+              <select
+                value={criteria.school_rating_min || ''}
+                onChange={setNum('school_rating_min')}
+                className="w-full py-1.5 px-3 border rounded text-sm"
+              >
+                <option value="">Any</option>
+                {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n}+</option>)}
+              </select>
             </div>
           </div>
         </div>

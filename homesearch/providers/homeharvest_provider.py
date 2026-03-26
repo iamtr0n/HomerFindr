@@ -8,11 +8,13 @@ from homesearch.providers.base import BaseProvider
 
 
 # Map our ListingType to homeharvest's listing_type parameter
+# Valid homeharvest ListingType values: "for_sale", "for_rent", "sold", "pending"
+# There is no "coming_soon" in homeharvest — it maps to "pending" (pre-market/pending listings)
 _LISTING_TYPE_MAP = {
     ListingType.SALE: "for_sale",
     ListingType.RENT: "for_rent",
     ListingType.SOLD: "sold",
-    ListingType.COMING_SOON: "coming_soon",
+    ListingType.COMING_SOON: "pending",
 }
 
 
@@ -30,36 +32,44 @@ class HomeHarvestProvider(BaseProvider):
 
         locations = self._build_locations(criteria)
         types_to_run = criteria.listing_types if criteria.listing_types else [criteria.listing_type]
-        total = len(locations) * len(types_to_run)
+
+        # Build deduplicated list of homeharvest type strings (preserves order)
+        hh_types = [_LISTING_TYPE_MAP.get(lt, "for_sale") for lt in types_to_run]
+        hh_types = list(dict.fromkeys(hh_types))
+
+        # Batch all types into a single API call per location (not N calls per location)
+        total = len(locations)
+        include_sold = "sold" in hh_types
+
+        # If only one type, pass as string; otherwise pass list (homeharvest accepts both)
+        listing_type_arg = hh_types[0] if len(hh_types) == 1 else hh_types
+        # Default listing_type string for _row_to_listing mapping (informational)
+        default_lt = hh_types[0]
 
         all_listings: list[Listing] = []
-        progress_idx = 0
 
-        for lt_enum in types_to_run:
-            listing_type = _LISTING_TYPE_MAP.get(lt_enum, "for_sale")
-            for location in locations:
-                progress_idx += 1
-                if on_progress:
-                    on_progress(progress_idx, total, location)
-                try:
-                    time.sleep(1.5)  # Rate limiting - be respectful
-                    df = homeharvest.scrape_property(
-                        location=location,
-                        listing_type=listing_type,
-                        past_days=30 if lt_enum == ListingType.SOLD else None,
-                    )
+        for progress_idx, location in enumerate(locations, start=1):
+            if on_progress:
+                on_progress(progress_idx, total, location)
+            try:
+                time.sleep(1.5)  # Rate limiting - be respectful
+                df = homeharvest.scrape_property(
+                    location=location,
+                    listing_type=listing_type_arg,
+                    past_days=30 if include_sold else None,
+                )
 
-                    if df is None or df.empty:
-                        continue
-
-                    for _, row in df.iterrows():
-                        listing = self._row_to_listing(row, listing_type)
-                        if listing:
-                            all_listings.append(listing)
-
-                except Exception:
-                    traceback.print_exc()
+                if df is None or df.empty:
                     continue
+
+                for _, row in df.iterrows():
+                    listing = self._row_to_listing(row, default_lt)
+                    if listing:
+                        all_listings.append(listing)
+
+            except Exception:
+                traceback.print_exc()
+                continue
 
         return all_listings
 

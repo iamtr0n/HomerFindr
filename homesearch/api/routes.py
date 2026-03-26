@@ -218,6 +218,53 @@ def send_report_endpoint():
     return {"sent": success}
 
 
+# --- Location autocomplete ---
+
+@app.get("/api/locations/search")
+def search_locations(q: str = ""):
+    """Typeahead location search — returns unique city+state pairs."""
+    from uszipcode import SearchEngine
+    from homesearch.services.zip_service import _parse_city, _parse_state
+
+    q = q.strip()
+    if len(q) < 2:
+        return {"suggestions": []}
+
+    search = SearchEngine()
+
+    city_part = _parse_city(q)
+    state_part = _parse_state(q)
+
+    # Try direct city search first; if no results, use fuzzy find_city candidates
+    results = search.by_city(city=city_part, returns=50)
+    if not results:
+        candidates = search.find_city(city_part, best_match=False) or []
+        for candidate in candidates[:5]:
+            r = search.by_city(city=candidate, returns=50)
+            if r:
+                results = r
+                break
+
+    # Filter to specified state if user typed one
+    if state_part:
+        results = [r for r in results if (r.state or "").upper() == state_part.upper()]
+
+    # Build unique city+state suggestions
+    seen = set()
+    suggestions = []
+    for r in results:
+        city = r.major_city or r.post_office_city or ""
+        state = r.state or ""
+        key = f"{city.upper()}|{state.upper()}"
+        if key not in seen and city:
+            seen.add(key)
+            suggestions.append({"city": city, "state": state})
+        if len(suggestions) >= 8:
+            break
+
+    return {"suggestions": suggestions}
+
+
 # --- Serve frontend static files ---
 
 FRONTEND_DIR = Path(__file__).parent.parent.parent / "frontend" / "dist"

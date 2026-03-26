@@ -25,14 +25,26 @@ def discover_zip_codes(location: str, radius_miles: int = 25) -> list[ZipInfo]:
         lat, lng = center.lat, center.lng
     else:
         # Try to geocode the city/state
+        parsed_city = _parse_city(location_clean)
+        parsed_state = _parse_state(location_clean)
         results = search.by_city_and_state(
-            city=_parse_city(location_clean),
-            state=_parse_state(location_clean),
-            returns=1,
+            city=parsed_city,
+            state=parsed_state,
+            returns=5,
         )
+        # Filter by state to prevent uszipcode cross-state leakage
+        if parsed_state and results:
+            results = [r for r in results if (r.state or "").upper() == parsed_state.upper()]
         if not results:
-            # Fallback: search by city name alone
-            results = search.by_city(city=_parse_city(location_clean), returns=1)
+            # Fallback: fuzzy city resolution via find_city candidates
+            candidates = search.find_city(parsed_city, best_match=False) or [parsed_city]
+            for candidate in candidates[:5]:
+                r = search.by_city(city=candidate, returns=50)
+                if parsed_state:
+                    r = [x for x in r if (x.state or "").upper() == parsed_state.upper()]
+                if r:
+                    results = r
+                    break
         if not results:
             return []
         lat, lng = results[0].lat, results[0].lng

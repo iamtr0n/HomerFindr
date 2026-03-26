@@ -68,8 +68,8 @@ def _handle_new_search():
         console.print("[dim]Search cancelled.[/dim]")
         return
 
-    results = execute_search_with_spinner(criteria)
-    display_results(results, criteria)
+    results, pre_filter_count = execute_search_with_spinner(criteria)
+    display_results(results, criteria, pre_filter_count=pre_filter_count)
 
 
 def _handle_saved_searches():

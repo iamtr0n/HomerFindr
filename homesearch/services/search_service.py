@@ -41,10 +41,13 @@ def run_search(
     search_id: Optional[int] = None,
     use_zip_discovery: bool = True,
     errors: Optional[list] = None,
+    pre_filter_counts: Optional[list] = None,
 ) -> list[Listing]:
     """Execute a search across all providers, dedupe, filter, and return results.
 
     If search_id is provided, results are persisted and linked to that saved search.
+    If pre_filter_counts is provided (as a list), appends the count of deduplicated
+    listings before client-side filtering so callers can diagnose zero-result causes.
     """
     db.init_db()
 
@@ -78,6 +81,10 @@ def run_search(
                 seen_addresses[key] = listing
 
     deduped = list(seen_addresses.values())
+
+    # Record pre-filter count for caller diagnostics
+    if pre_filter_counts is not None:
+        pre_filter_counts.append(len(deduped))
 
     # Apply client-side filters for fields not supported by all providers
     filtered = [l for l in deduped if _passes_filters(l, criteria)]

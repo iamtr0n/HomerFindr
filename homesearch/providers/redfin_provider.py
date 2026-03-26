@@ -61,7 +61,12 @@ class RedfinProvider(BaseProvider):
                     if listing:
                         all_listings.append(listing)
 
-            except Exception:
+            except Exception as e:
+                # Check for 403 specifically — Redfin blocks automated access
+                err_str = str(e)
+                if "403" in err_str or "Forbidden" in err_str:
+                    print("[Redfin] API access blocked (403) — skipping Redfin results")
+                    break  # All locations will fail the same way; stop looping
                 traceback.print_exc()
                 continue
 

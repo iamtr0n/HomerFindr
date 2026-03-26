@@ -22,20 +22,24 @@ from homesearch.tui.styles import (
 )
 
 
-def execute_search_with_spinner(criteria: SearchCriteria) -> list[Listing]:
+def execute_search_with_spinner(criteria: SearchCriteria) -> tuple[list[Listing], int]:
     """Run search in background thread with animated Rich spinner.
 
     Per D-17: threading.Thread(daemon=True) for non-blocking.
     Per D-18: Provider name cycling in spinner text.
     CRITICAL: Rich Live must fully exit before any questionary prompt.
+
+    Returns (results, pre_filter_count) so callers can diagnose zero-result causes.
+    pre_filter_count is the number of deduplicated listings before client-side filters.
     """
     results: list[Listing] = []
     error: list[Exception] = []
+    pre_filter_counts: list[int] = []
     done_event = threading.Event()
 
     def _search_worker():
         try:
-            found = run_search(criteria, use_zip_discovery=True)
+            found = run_search(criteria, use_zip_discovery=True, pre_filter_counts=pre_filter_counts)
             results.extend(found)
         except Exception as e:
             error.append(e)
@@ -69,10 +73,11 @@ def execute_search_with_spinner(criteria: SearchCriteria) -> list[Listing]:
         console.print(f"[yellow]Warning: search encountered an error — {error[0]}[/yellow]")
         # Per D-19: continue with whatever results we got
 
-    return results
+    pre_filter_count = pre_filter_counts[0] if pre_filter_counts else 0
+    return results, pre_filter_count
 
 
-def display_results(results: list[Listing], criteria: SearchCriteria) -> None:
+def display_results(results: list[Listing], criteria: SearchCriteria, pre_filter_count: int = 0) -> None:
     """Display search results in Rich table with URL opening.
 
     Per D-13: Colored columns.
@@ -81,7 +86,41 @@ def display_results(results: list[Listing], criteria: SearchCriteria) -> None:
     Per D-16: Save search prompt after viewing.
     """
     if not results:
-        console.print("[yellow]No properties found matching your criteria.[/yellow]")
+        if pre_filter_count > 0:
+            # Listings were found but all filtered out — help the user understand why
+            console.print(
+                f"[yellow]No properties matched your filters "
+                f"({pre_filter_count} listing{'s' if pre_filter_count != 1 else ''} found before filtering).[/yellow]"
+            )
+            console.print("[dim]Active filters that may be too restrictive:[/dim]")
+            if criteria.price_min is not None or criteria.price_max is not None:
+                lo = f"${criteria.price_min:,}" if criteria.price_min is not None else "any"
+                hi = f"${criteria.price_max:,}" if criteria.price_max is not None else "any"
+                console.print(f"  [cyan]Price:[/cyan] {lo} – {hi}")
+            if criteria.bedrooms_min is not None:
+                console.print(f"  [cyan]Bedrooms:[/cyan] {criteria.bedrooms_min}+")
+            if criteria.bathrooms_min is not None:
+                console.print(f"  [cyan]Bathrooms:[/cyan] {criteria.bathrooms_min}+")
+            if criteria.sqft_min is not None or criteria.sqft_max is not None:
+                lo = f"{criteria.sqft_min:,}" if criteria.sqft_min is not None else "any"
+                hi = f"{criteria.sqft_max:,}" if criteria.sqft_max is not None else "any"
+                console.print(f"  [cyan]Sq ft:[/cyan] {lo} – {hi}")
+            if criteria.property_types:
+                pts = ", ".join(pt.value for pt in criteria.property_types)
+                console.print(f"  [cyan]Property type:[/cyan] {pts}")
+            if criteria.year_built_min is not None:
+                console.print(f"  [cyan]Year built:[/cyan] {criteria.year_built_min}+")
+            if criteria.hoa_max is not None:
+                label = "No HOA" if criteria.hoa_max == 0.0 else f"up to ${criteria.hoa_max:.0f}/mo"
+                console.print(f"  [cyan]HOA:[/cyan] {label}")
+            if criteria.has_garage is not None:
+                console.print(f"  [cyan]Garage:[/cyan] {'required' if criteria.has_garage else 'none'}")
+            if criteria.has_basement is not None:
+                console.print(f"  [cyan]Basement:[/cyan] {'required' if criteria.has_basement else 'none'}")
+            console.print("[dim]Try running the search again with broader criteria.[/dim]")
+        else:
+            console.print("[yellow]No properties found matching your criteria.[/yellow]")
+            console.print("[dim]Try a different location or broader search area.[/dim]")
         return
 
     # Count unique providers

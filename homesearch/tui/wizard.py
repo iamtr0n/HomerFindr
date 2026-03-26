@@ -213,7 +213,7 @@ def run_search_wizard() -> SearchCriteria | None:
 
 def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
     """Execute the wizard fields once. Returns (criteria, action) or None on cancel."""
-    from homesearch.services.zip_service import discover_zip_codes
+    from homesearch.tui.zip_browser import show_zip_browser
 
     # ------------------------------------------------------------------
     # 1. Listing Type (required — no instruction hint)
@@ -255,21 +255,7 @@ def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
     property_types = [] if prop_answer == "Any" else [prop_map[prop_answer]]
 
     # ------------------------------------------------------------------
-    # 3. Location (only free-typing field per D-08)
-    # ------------------------------------------------------------------
-    location_answer = questionary.text(
-        "City, State or ZIP code:",
-        style=HOUSE_STYLE,
-    ).ask()
-    if location_answer is None:
-        return None
-    location = location_answer.strip()
-    if not location:
-        console.print("[red]Location is required.[/red]")
-        return None
-
-    # ------------------------------------------------------------------
-    # 4. Radius
+    # 3. Radius (moved before location so it applies to all ZIP browser calls)
     # ------------------------------------------------------------------
     radius_answer = questionary.select(
         "Search radius:",
@@ -283,24 +269,79 @@ def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
     radius_miles = int(radius_answer.split()[0])
 
     # ------------------------------------------------------------------
-    # 5. ZIP Discovery (automatic — no manual ZIP selection needed)
+    # 4. Search Mode + Location + ZIP Discovery
     # ------------------------------------------------------------------
+    search_mode = questionary.select(
+        "Search mode:",
+        choices=["Single area", "Multiple areas (combine ZIP codes)"],
+        style=HOUSE_STYLE,
+    ).ask()
+    if search_mode is None:
+        return None
+
     zip_codes: list[str] = []
     excluded_zips: list[str] = []
+    location: str = ""
 
-    with console.status("Discovering ZIP codes..."):
-        discovered = discover_zip_codes(location, radius_miles)
+    if search_mode == "Single area":
+        # --- Single area ---
+        location_answer = questionary.text(
+            "City, State or ZIP code:",
+            style=HOUSE_STYLE,
+        ).ask()
+        if location_answer is None:
+            return None
+        location = location_answer.strip()
+        if not location:
+            console.print("[red]Location is required.[/red]")
+            return None
 
-    if discovered:
-        # Cap at 50 most-populated ZIPs to keep search time reasonable (1.5s/ZIP rate limit)
-        top_zips = discovered[:50]
-        zip_codes = [z.zipcode for z in top_zips]
-        extra = len(discovered) - len(top_zips)
-        note = f" (top {len(zip_codes)} by population)" if extra > 0 else ""
-        console.print(
-            f"[green]✓ Searching {len(zip_codes)} ZIP code(s) within {radius_miles} miles of {location}{note}.[/green]"
-        )
+        selected = show_zip_browser(location, radius_miles)
+        if selected is None:
+            return None
+        zip_codes = selected
     else:
+        # --- Multiple areas ---
+        all_locations: list[str] = []
+        all_zips: list[str] = []
+
+        while True:
+            location_answer = questionary.text(
+                "City, State or ZIP code:",
+                style=HOUSE_STYLE,
+            ).ask()
+            if location_answer is None:
+                return None
+            loc = location_answer.strip()
+            if not loc:
+                console.print("[red]Location is required.[/red]")
+                continue
+            all_locations.append(loc)
+
+            selected = show_zip_browser(loc, radius_miles)
+            if selected is None:
+                return None
+            all_zips.extend(selected)
+
+            add_more = questionary.confirm(
+                "Add another location?",
+                default=False,
+                style=HOUSE_STYLE,
+            ).ask()
+            if add_more is None:
+                return None
+            if not add_more:
+                break
+
+        # Deduplicate while preserving order
+        zip_codes = list(dict.fromkeys(all_zips))
+        location = all_locations[0] if all_locations else ""
+        console.print(
+            f"[green]Selected {len(zip_codes)} ZIP codes across "
+            f"{len(all_locations)} area(s): {', '.join(all_locations)}[/green]"
+        )
+
+    if not zip_codes and not location:
         console.print("[yellow]No ZIP codes found — searching by location name.[/yellow]")
 
     # ------------------------------------------------------------------

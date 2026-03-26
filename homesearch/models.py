@@ -141,3 +141,4 @@ class ZipInfo(BaseModel):
     latitude: float
     longitude: float
     population: Optional[int] = None
+    county: Optional[str] = None

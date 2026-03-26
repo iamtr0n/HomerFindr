@@ -62,6 +62,7 @@ def discover_zip_codes(location: str, radius_miles: int = 25) -> list[ZipInfo]:
                 latitude=z.lat,
                 longitude=z.lng,
                 population=z.population,
+                county=z.county or "",
             ))
 
     # Sort by population descending (most relevant areas first)

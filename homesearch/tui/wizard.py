@@ -366,18 +366,9 @@ def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
         return None
     price_min, price_max = _parse_multi_price(price_answers)
     if "Custom range" in price_answers:
-        custom_min_str = questionary.text(
-            "Custom minimum price (leave blank for no min):",
-            style=HOUSE_STYLE,
-        ).ask()
-        if custom_min_str is None:
-            return None
-        custom_max_str = questionary.text(
-            "Custom maximum price (leave blank for no max):",
-            style=HOUSE_STYLE,
-        ).ask()
-        if custom_max_str is None:
-            return None
+        from rich.prompt import Prompt
+        custom_min_str = Prompt.ask("  Min price (Enter to skip)", default="")
+        custom_max_str = Prompt.ask("  Max price (Enter to skip)", default="")
         try:
             price_min = int(custom_min_str.strip().replace(",", "").replace("$", "")) if custom_min_str.strip() else None
         except ValueError:

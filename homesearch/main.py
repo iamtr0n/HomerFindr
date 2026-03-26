@@ -36,7 +36,9 @@ def search():
     """Interactive search wizard - find properties with detailed filters."""
     from homesearch.tui.wizard import run_search_wizard
     from homesearch.tui.results import execute_search_with_spinner, display_results
+    from homesearch.tui.splash import show_splash
 
+    show_splash()
     db.init_db()
     while True:
         criteria = run_search_wizard()

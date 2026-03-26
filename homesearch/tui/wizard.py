@@ -288,6 +288,7 @@ def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
         "For Rent": ListingType.RENT,
         "Recently Sold": ListingType.SOLD,
         "Coming Soon": ListingType.COMING_SOON,
+        "Pending": ListingType.PENDING,
     }
 
     def _step_listing_type(s):
@@ -328,6 +329,19 @@ def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
         questionary.Choice("Mediterranean · ~3,000–6,000 sqft · stucco exterior, red tile roof, arched windows", value="Mediterranean"),
         questionary.Choice("Farmhouse     · ~2,000–3,500 sqft · large porch, board & batten, metal roof", value="Farmhouse"),
     ]
+
+    def _step_days_pending(s):
+        lts = s.get("listing_types", [])
+        if ListingType.PENDING not in lts:
+            return {"days_pending_min": None}
+        r = _s(
+            "Minimum days pending:",
+            ["Any", "7+ days", "14+ days", "30+ days", "45+ days", "60+ days"],
+        )
+        if r is None or r == _BACK:
+            return r
+        mapping = {"Any": None, "7+ days": 7, "14+ days": 14, "30+ days": 30, "45+ days": 45, "60+ days": 60}
+        return {"days_pending_min": mapping.get(r)}
 
     def _step_property_type(s):
         r = _s("Property type:", ["Any", "Single Family", "Condo", "Townhouse", "Multi-Family", "Commercial", "Land"])
@@ -517,6 +531,7 @@ def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
 
     steps = [
         _step_listing_type,
+        _step_days_pending,
         _step_property_type,
         _step_radius,
         _step_search_mode,
@@ -586,11 +601,12 @@ def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
             has_ac=state.get("has_ac"),
             heat_type=state.get("heat_type"),
             has_pool=state.get("has_pool"),
+            days_pending_min=state.get("days_pending_min"),
         )
 
     # Human-readable label for each step index
     _STEP_NAMES = [
-        "Listing type", "Property type & style", "Search radius",
+        "Listing type", "Days pending", "Property type & style", "Search radius",
         "Search mode", "Location & ZIPs", "Price range", "Bedrooms",
         "Bathrooms", "Square footage", "Lot size", "Year built", "Stories",
         "Basement", "Garage", "Fireplace", "Air Conditioning", "Heat type",
@@ -604,66 +620,72 @@ def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
             lts = s.get("listing_types", [])
             return ", ".join(lt.value for lt in lts) if lts else "For Sale"
         if idx == 1:
+            lts = s.get("listing_types", [])
+            if ListingType.PENDING not in lts:
+                return "(n/a)"
+            v = s.get("days_pending_min")
+            return f"{v}+ days" if v else "Any"
+        if idx == 2:
             pa = s.get("prop_answer", "Any")
             hs = s.get("house_styles", [])
             suffix = f"  ({', '.join(h.replace('_', ' ').title() for h in hs)})" if hs else ""
             return pa + suffix
-        if idx == 2:
-            return f"{s.get('radius_miles', 25)} miles"
         if idx == 3:
-            return s.get("search_mode", "Single area")
+            return f"{s.get('radius_miles', 25)} miles"
         if idx == 4:
+            return s.get("search_mode", "Single area")
+        if idx == 5:
             loc = s.get("location", "")
             zips = s.get("zip_codes", [])
             return f"{loc}  ({len(zips)} ZIPs)" if zips else loc or "—"
-        if idx == 5:
+        if idx == 6:
             lo, hi = s.get("price_min"), s.get("price_max")
             if lo is None and hi is None:
                 return "Any"
             return f"{'$' + f'{lo:,.0f}' if lo else 'Any'} – {'$' + f'{hi:,.0f}' if hi else 'Any'}"
-        if idx == 6:
+        if idx == 7:
             v = s.get("bedrooms_min")
             return f"{v}+" if v else "Any"
-        if idx == 7:
+        if idx == 8:
             v = s.get("bathrooms_min")
             return f"{v}+" if v else "Any"
-        if idx == 8:
+        if idx == 9:
             lo, hi = s.get("sqft_min"), s.get("sqft_max")
             if lo is None and hi is None:
                 return "Any"
             return f"{f'{lo:,}' if lo else 'Any'} – {f'{hi:,}' if hi else 'Any'} sqft"
-        if idx == 9:
+        if idx == 10:
             lo, hi = s.get("lot_sqft_min"), s.get("lot_sqft_max")
             if lo is None and hi is None:
                 return "Any"
             return f"{f'{lo:,}' if lo else 'Any'} – {f'{hi:,}' if hi else 'Any'} sqft"
-        if idx == 10:
+        if idx == 11:
             v = s.get("year_built_min")
             return f"{v}+" if v else "Any"
-        if idx == 11:
+        if idx == 12:
             v = s.get("stories_min")
             return f"{v}+" if v else "Any"
-        if idx == 12:
+        if idx == 13:
             v = s.get("has_basement")
             return "Must have" if v is True else ("No basement" if v is False else "Don't care")
-        if idx == 13:
+        if idx == 14:
             v = s.get("has_garage")
             gs = s.get("garage_spaces_min")
             base = "Must have" if v is True else ("No garage" if v is False else "Don't care")
             return f"{base}  ({gs}+ spaces)" if gs and v is True else base
-        if idx == 14:
+        if idx == 15:
             v = s.get("has_fireplace")
             return "Must have" if v is True else ("No fireplace" if v is False else "Don't care")
-        if idx == 15:
+        if idx == 16:
             v = s.get("has_ac")
             return "Must have" if v is True else ("No AC" if v is False else "Don't care")
-        if idx == 16:
+        if idx == 17:
             v = s.get("heat_type")
             return v.title() if v else "Don't care"
-        if idx == 17:
+        if idx == 18:
             v = s.get("has_pool")
             return "Must have" if v is True else ("No pool" if v is False else "Don't care")
-        if idx == 18:
+        if idx == 19:
             v = s.get("hoa_max")
             if v is None:
                 return "Any"

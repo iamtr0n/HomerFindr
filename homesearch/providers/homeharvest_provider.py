@@ -17,6 +17,7 @@ _LISTING_TYPE_MAP = {
     ListingType.RENT: "for_rent",
     ListingType.SOLD: "sold",
     ListingType.COMING_SOON: "pending",
+    ListingType.PENDING: "pending",
 }
 
 
@@ -45,13 +46,10 @@ class HomeHarvestProvider(BaseProvider):
         default_lt = hh_types[0]
 
         all_listings: list[Listing] = []
-        lock = threading.Lock()
-        completed = [0]
 
-        def _fetch_one(args):
-            idx, location = args
-            # Stagger 3 parallel workers so requests don't all fire at once
-            time.sleep((idx % 3) * 0.6)
+        for progress_idx, location in enumerate(locations, start=1):
+            if on_progress:
+                on_progress(progress_idx, total, location, len(all_listings))
             try:
                 time.sleep(1.5)  # Rate limiting - be respectful
                 df = homeharvest.scrape_property(
@@ -65,29 +63,12 @@ class HomeHarvestProvider(BaseProvider):
                         listing = self._row_to_listing(row, default_lt)
                         if listing:
                             batch.append(listing)
-                return location, batch
+                all_listings.extend(batch)
+                if on_partial and batch:
+                    on_partial(list(batch))
             except Exception:
                 traceback.print_exc()
-                return location, []
-
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            future_map = {
-                executor.submit(_fetch_one, (i, loc)): loc
-                for i, loc in enumerate(locations)
-            }
-            for future in as_completed(future_map):
-                try:
-                    location, batch = future.result()
-                except Exception as e:
-                    traceback.print_exc()
-                    location, batch = future_map[future], []
-                with lock:
-                    all_listings.extend(batch)
-                    completed[0] += 1
-                    if on_progress:
-                        on_progress(completed[0], total, location, len(all_listings))
-                    if on_partial and batch:
-                        on_partial(list(batch))
+                continue
 
         return all_listings
 
@@ -186,11 +167,30 @@ class HomeHarvestProvider(BaseProvider):
             from homesearch.services.school_service import get_school_rating_from_row
             school_rating, school_district = get_school_rating_from_row(row)
 
-            # Raw house style (e.g. "CAPE_COD", "RANCH", "COLONIAL")
-            raw_style = str(row.get("style", "") or "").strip()
-            house_style = raw_style.lower().replace(" ", "_") if raw_style else None
+            # House style from description (style column is property type, not architectural style)
+            # Order matters: more specific phrases before substrings (raised ranch before ranch)
+            house_style = None
+            for _hs, _kws in [
+                ("raised_ranch",   ["raised ranch", "raised-ranch"]),
+                ("split_level",    ["split level", "split-level"]),
+                ("bi_level",       ["bi level", "bi-level", "bilevel"]),
+                ("cape_cod",       ["cape cod", "cape-cod"]),
+                ("colonial",       ["colonial"]),
+                ("ranch",          ["ranch"]),
+                ("farmhouse",      ["farmhouse"]),
+                ("craftsman",      ["craftsman"]),
+                ("tudor",          ["tudor"]),
+                ("mediterranean",  ["mediterranean"]),
+                ("victorian",      ["victorian"]),
+                ("contemporary",   ["contemporary"]),
+                ("traditional",    ["traditional"]),
+            ]:
+                if any(kw in desc for kw in _kws):
+                    house_style = _hs
+                    break
 
-            # Property type mapping
+            # Property type mapping (style column holds property type: SINGLE_FAMILY, CONDO, etc.)
+            raw_style = str(row.get("style", "") or "").strip()
             ptype = str(raw_style or row.get("property_type", "") or "").lower()
             property_type = "single_family"
             if "condo" in ptype:
@@ -204,11 +204,23 @@ class HomeHarvestProvider(BaseProvider):
             elif "commercial" in ptype:
                 property_type = "commercial"
 
+            # Agent / pending fields
+            days_on_mls = _safe_int(row.get("days_on_mls"))
+            agent_name = str(row.get("agent_name") or "").strip() or None
+            _phones = row.get("agent_phones") or ""
+            if isinstance(_phones, list):
+                agent_phone = str(_phones[0]).strip() if _phones else None
+            else:
+                agent_phone = str(_phones).strip() or None
+            agent_email = str(row.get("agent_email") or "").strip() or None
+
             lt = "sale"
             if listing_type == "for_rent":
                 lt = "rent"
             elif listing_type == "sold":
                 lt = "sold"
+            elif listing_type == "pending":
+                lt = "pending"
 
             return Listing(
                 source="realtor",
@@ -241,6 +253,10 @@ class HomeHarvestProvider(BaseProvider):
                 longitude=lon,
                 photo_url=photo,
                 source_url=source_url,
+                days_on_mls=days_on_mls,
+                agent_name=agent_name,
+                agent_phone=agent_phone,
+                agent_email=agent_email,
             )
         except Exception:
             traceback.print_exc()

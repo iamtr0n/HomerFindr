@@ -17,6 +17,11 @@ DEFAULT_CONFIG = {
         "property_types": [],
         "price_min": None,
         "price_max": None,
+        "bedrooms_min": None,
+        "bathrooms_min": None,
+        "sqft_min": None,
+        "hoa_max": None,
+        "avoid_highways": False,
     },
     "smtp": {
         "provider": "",
@@ -25,6 +30,30 @@ DEFAULT_CONFIG = {
         "email": "",
         "password": "",
         "recipients": [],
+    },
+    "notifications": {
+        "zapier_webhook": "",
+        "desktop_enabled": True,
+        "alert_on_status_change": True,
+        "coming_soon_only": False,
+        "webhook_interval_minutes": 3,
+        "desktop_interval_minutes": 10,
+    },
+    "display": {
+        "results_per_page": 50,
+        "default_sort": "match_score",
+        "starred_first": True,
+    },
+    "providers": {
+        "homeharvest_enabled": True,
+        "redfin_enabled": True,
+        "rate_limit_seconds": 1.5,
+        "max_zips_per_search": 50,
+    },
+    "report": {
+        "hour": 7,
+        "minute": 0,
+        "new_only": False,
     },
     "version": "1.0",
 }

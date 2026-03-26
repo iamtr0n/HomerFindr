@@ -137,7 +137,7 @@ def run_search(
     if search_id is not None:
         previous_ids = db.get_previous_listing_ids(search_id)
         for listing in filtered:
-            lid = db.upsert_listing(listing)
+            lid, _prev_type = db.upsert_listing(listing)
             listing.id = lid
             is_new = lid not in previous_ids
             db.link_search_result(search_id, lid, is_new=is_new)
@@ -328,14 +328,21 @@ def _passes_filters(listing: Listing, criteria: SearchCriteria) -> bool:
         if listing.property_type is not None and listing.property_type not in pt_vals:
             return False
 
-    # House style filter — skip listings whose style doesn't match any selected style
+    # House style filter — fuzzy match (handles hyphens, underscores, spaces)
     if criteria.house_styles and listing.house_style:
-        if not any(s in listing.house_style for s in criteria.house_styles):
+        def _norm(s): return s.lower().replace("-", "_").replace(" ", "_")
+        ls = _norm(listing.house_style)
+        if not any(_norm(s) in ls or ls in _norm(s) for s in criteria.house_styles):
             return False
 
     # School rating minimum
     if criteria.school_rating_min and listing.school_rating and listing.school_rating < criteria.school_rating_min:
         return False
+
+    # Days pending minimum (only filters pending listings; other types pass through)
+    if criteria.days_pending_min is not None and listing.listing_type == "pending":
+        if listing.days_on_mls is None or listing.days_on_mls < criteria.days_pending_min:
+            return False
 
     # ZIP exclusion
     if criteria.excluded_zips and listing.zip_code in criteria.excluded_zips:

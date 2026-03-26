@@ -39,6 +39,12 @@ def tui_main():
 
     show_splash()
 
+    # Start background scheduler so alerts fire even without 'homesearch serve'
+    from homesearch import database as db
+    from homesearch.services.scheduler_service import start_scheduler
+    db.init_db()
+    start_scheduler()
+
     # First-run check — triggers when no config file exists (D-06)
     from homesearch.tui.config import config_exists
     from homesearch.tui.first_run import run_first_run_wizard

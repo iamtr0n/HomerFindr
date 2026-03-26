@@ -100,6 +100,12 @@ def init_db():
         conn.commit()
     except Exception:
         pass  # Column already exists
+    # Add is_starred column to listings (marks listings that triggered an alert)
+    try:
+        conn.execute("ALTER TABLE listings ADD COLUMN is_starred INTEGER DEFAULT 0")
+        conn.commit()
+    except Exception:
+        pass  # Column already exists
     conn.close()
 
 
@@ -257,21 +263,26 @@ def delete_search(search_id: int):
 
 # --- Listings ---
 
-def upsert_listing(listing: Listing) -> int:
+def upsert_listing(listing: Listing) -> tuple[int, Optional[str]]:
+    """Insert or update a listing. Returns (listing_id, previous_listing_type).
+    previous_listing_type is None for new listings, or the old value when the listing
+    already existed (useful for detecting status changes like sale → pending).
+    """
     conn = get_connection()
     try:
         existing = conn.execute(
-            "SELECT id FROM listings WHERE source = ? AND source_id = ?",
+            "SELECT id, listing_type FROM listings WHERE source = ? AND source_id = ?",
             (listing.source, listing.source_id),
         ).fetchone()
 
         if existing:
+            prev_type = existing["listing_type"]
             conn.execute(
-                "UPDATE listings SET price=?, last_seen_at=datetime('now'), photo_url=?, source_url=? WHERE id=?",
-                (listing.price, listing.photo_url, listing.source_url, existing["id"]),
+                "UPDATE listings SET price=?, listing_type=?, last_seen_at=datetime('now'), photo_url=?, source_url=? WHERE id=?",
+                (listing.price, listing.listing_type, listing.photo_url, listing.source_url, existing["id"]),
             )
             conn.commit()
-            return existing["id"]
+            return existing["id"], prev_type
 
         cursor = conn.execute(
             """INSERT INTO listings (
@@ -298,7 +309,17 @@ def upsert_listing(listing: Listing) -> int:
             ),
         )
         conn.commit()
-        return cursor.lastrowid
+        return cursor.lastrowid, None
+    finally:
+        conn.close()
+
+
+def mark_listing_starred(listing_id: int) -> None:
+    """Mark a listing as starred (triggered an alert notification)."""
+    conn = get_connection()
+    try:
+        conn.execute("UPDATE listings SET is_starred = 1 WHERE id = ?", (listing_id,))
+        conn.commit()
     finally:
         conn.close()
 
@@ -387,4 +408,5 @@ def _row_to_listing(row) -> Listing:
         source_url=row["source_url"],
         first_seen_at=datetime.fromisoformat(row["first_seen_at"]) if row["first_seen_at"] else None,
         last_seen_at=datetime.fromisoformat(row["last_seen_at"]) if row["last_seen_at"] else None,
+        is_starred=bool(row["is_starred"]) if "is_starred" in row.keys() and row["is_starred"] else False,
     )

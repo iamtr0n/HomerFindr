@@ -14,6 +14,7 @@ class ListingType(str, Enum):
     RENT = "rent"
     SOLD = "sold"
     COMING_SOON = "coming_soon"
+    PENDING = "pending"
 
 
 class PropertyType(str, Enum):
@@ -70,6 +71,7 @@ class SearchCriteria(BaseModel):
     school_rating_min: Optional[int] = None  # 1-10
 
     house_styles: list[str] = Field(default_factory=list)  # e.g. ["cape_cod", "ranch"]
+    days_pending_min: Optional[int] = None  # Only show pending listings with >= this many days on market
 
 
 class Listing(BaseModel):
@@ -111,8 +113,13 @@ class Listing(BaseModel):
     match_score: int = 0
     match_badges: list[str] = Field(default_factory=list)
     is_gold_star: bool = False
+    is_starred: bool = False  # Starred by a notification alert (tracked across searches)
     first_seen_at: Optional[datetime] = None
     last_seen_at: Optional[datetime] = None
+    days_on_mls: Optional[int] = None
+    agent_name: Optional[str] = None
+    agent_phone: Optional[str] = None
+    agent_email: Optional[str] = None
 
 
 class NotificationSettings(BaseModel):

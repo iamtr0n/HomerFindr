@@ -39,13 +39,61 @@ def start_scheduler():
 
         try:
             previous_ids = set(db.get_previous_listing_ids(s.id))
+
+            # Snapshot current listing types before the search to detect status changes
+            conn = db.get_connection()
+            try:
+                prev_types: dict[int, str] = {
+                    row["listing_id"]: row["listing_type"]
+                    for row in conn.execute(
+                        "SELECT sr.listing_id, l.listing_type FROM search_results sr "
+                        "JOIN listings l ON l.id = sr.listing_id WHERE sr.search_id = ?",
+                        (s.id,),
+                    ).fetchall()
+                }
+            finally:
+                conn.close()
+
             results = run_search(s.criteria, search_id=s.id)
             new_listings = [l for l in results if l.id and l.id not in previous_ids]
 
-            if not new_listings:
-                return
+            # Detect status changes: listing was previously "sale" and is now "pending"
+            status_changed = [
+                l for l in results
+                if l.id and l.id in prev_types and prev_types[l.id] == "sale" and l.listing_type == "pending"
+            ]
 
             ns = s.notification_settings
+            webhook_url = ns.zapier_webhook or settings.zapier_webhook_url
+
+            # Fire status-change alerts for sale→pending transitions
+            if status_changed and webhook_url:
+                import httpx
+                for l in status_changed:
+                    db.mark_listing_starred(l.id)
+                    try:
+                        payload = {
+                            "alert_type": "status_change",
+                            "search_name": s.name,
+                            "message": f"PENDING ALERT: {l.address} — was For Sale, now Pending ({l.days_on_mls or '?'} days on market)",
+                            "address": l.address,
+                            "city": l.city,
+                            "state": l.state,
+                            "price": l.price,
+                            "days_on_mls": l.days_on_mls,
+                            "agent_name": l.agent_name,
+                            "agent_phone": l.agent_phone,
+                            "agent_email": l.agent_email,
+                            "url": l.source_url,
+                            "warning": "High chance this sale is not going through — consider reaching out to the agent directly." if (l.days_on_mls or 0) >= 30 else "",
+                        }
+                        httpx.post(webhook_url, json=payload, timeout=10)
+                        print(f"[Alerts] Status-change webhook sent: {l.address} (sale→pending)")
+                    except Exception as e:
+                        print(f"[Alerts] Status-change webhook error: {e}")
+
+            if not new_listings:
+                return
 
             # Apply coming_soon filter
             if ns.notify_coming_soon_only:
@@ -54,6 +102,11 @@ def start_scheduler():
                     return
 
             count = len(new_listings)
+
+            # Mark new listings as starred (they triggered an alert)
+            for l in new_listings:
+                if l.id:
+                    db.mark_listing_starred(l.id)
 
             # Desktop notification via osascript (macOS)
             if ns.desktop and platform.system() == "Darwin":
@@ -70,11 +123,11 @@ def start_scheduler():
             print(f"[Alerts] {count} new listing(s) for '{s.name}'")
 
             # Zapier webhook dispatch — per-search URL takes precedence, falls back to global
-            webhook_url = ns.zapier_webhook or settings.zapier_webhook_url
             if webhook_url:
                 import httpx
                 try:
                     payload = {
+                        "alert_type": "new_listings",
                         "search_name": s.name,
                         "new_count": count,
                         "listing_type": s.criteria.listing_type.value if hasattr(s.criteria.listing_type, 'value') else str(s.criteria.listing_type),
@@ -90,6 +143,8 @@ def start_scheduler():
                                 "sqft": l.sqft,
                                 "url": l.source_url,
                                 "listing_type": l.listing_type,
+                                "agent_name": l.agent_name,
+                                "agent_phone": l.agent_phone,
                             }
                             for l in new_listings[:10]  # Cap at 10 to avoid huge payloads
                         ],

@@ -154,7 +154,7 @@ def display_results(results: list[Listing], criteria: SearchCriteria, pre_filter
 
         choices = []
         for i, l in enumerate(page, offset + 1):
-            star = "⭐" if l.is_gold_star else "  "
+            star = "⭐" if l.is_gold_star else ("★ " if l.is_starred else "  ")
             price = f"${l.price:,.0f}" if l.price else "N/A"
             beds = str(l.bedrooms or "?")
             baths = str(l.bathrooms or "?")
@@ -177,8 +177,10 @@ def display_results(results: list[Listing], criteria: SearchCriteria, pre_filter
         ).ask()
 
         if pick is None or pick == "exit":
+            _offer_save_search(criteria)
             return False
         if pick == "new_search":
+            _offer_save_search(criteria)
             return True
         if pick == "more":
             offset += page_size
@@ -246,6 +248,22 @@ def _show_detail_card(listing: Listing, max_score: int) -> str:
 
     if listing.school_rating:
         row("School Rating", f"{listing.school_rating}/10  {listing.school_district or ''}")
+
+    if listing.listing_type == "pending":
+        if listing.days_on_mls is not None:
+            row("Days Pending", f"{listing.days_on_mls} days on market")
+        if listing.agent_name:
+            row("Agent", listing.agent_name)
+        if listing.agent_phone:
+            row("Agent Phone", listing.agent_phone)
+        if listing.agent_email:
+            row("Agent Email", listing.agent_email)
+        if listing.days_on_mls is not None and listing.days_on_mls >= 30:
+            table.add_row(
+                "[bold yellow]⚠ Warning[/bold yellow]",
+                "[bold yellow]High chance this sale is not going through[/bold yellow]\n"
+                "[dim]Consider reaching out to the agent directly.[/dim]",
+            )
 
     row("Source", listing.source)
 
@@ -400,7 +418,11 @@ def _diagnose_filters(raw: list[Listing], criteria: SearchCriteria) -> list[tupl
             hits.append(("Property type", n, "Add more property types to your search"))
 
     if criteria.house_styles:
-        n = _elim(lambda l: l.house_style is not None and not any(s in l.house_style for s in criteria.house_styles))
+        def _norm(s): return s.lower().replace("-", "_").replace(" ", "_")
+        n = _elim(lambda l: l.house_style is not None and not any(
+            _norm(s) in _norm(l.house_style) or _norm(l.house_style) in _norm(s)
+            for s in criteria.house_styles
+        ))
         if n:
             hits.append(("House style", n, "Add more house styles or remove the style filter"))
 

@@ -30,7 +30,7 @@ Find homes fast across all platforms without juggling multiple websites — zero
 - ✓ Settings/Options page in CLI — configure SMTP, email recipients, search defaults (Validated in Phase 02)
 - ✓ SMTP setup wizard in CLI — guided arrow-key flow to configure email (Validated in Phase 02)
 - ✓ First-run experience — guided setup on first launch (location, preferences, optional SMTP) (Validated in Phase 02)
-- [ ] Desktop launchable — global `homerfindr` CLI command + macOS .app/dock shortcut
+- ✓ Desktop launchable — global `homerfindr` CLI command + macOS .app/dock shortcut (Validated in Phase 04)
 - [ ] Colorful/fun CLI experience — Rich-powered colors, progress bars, animated house loading
 - [ ] Web UI redesign — clean, minimal, Zillow/Redfin-inspired professional dashboard
 - [ ] Property cards with thumbnails, key details, click-through to original listing
@@ -87,4 +87,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-25 after initialization*
+*Last updated: 2026-03-26 — Phase 04 complete (Bridge and Desktop Packaging)*

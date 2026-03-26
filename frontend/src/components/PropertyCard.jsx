@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { ExternalLink, Bed, Bath, Ruler, Calendar, Home } from 'lucide-react'
 import { Card, CardContent } from './ui/Card'
 import { Badge } from './ui/Badge'
@@ -26,15 +26,41 @@ function DomBadge({ days }) {
   return null
 }
 
+const VIEWED_KEY = 'homerfindr_viewed'
+
+function readViewed() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(VIEWED_KEY) || '[]'))
+  } catch {
+    return new Set()
+  }
+}
+
+function writeViewed(set) {
+  try {
+    localStorage.setItem(VIEWED_KEY, JSON.stringify([...set]))
+  } catch {}
+}
+
 export default function PropertyCard({ listing, isGoldStar = false }) {
   const {
     address, city, state, price, bedrooms, bathrooms, sqft, year_built,
     has_garage, has_basement, stories, hoa_monthly, photo_url, source_url,
     source, zip_code, property_type, match_badges, near_highway, highway_name,
     school_rating, school_district, listing_type, match_score, days_on_mls,
+    source_id,
   } = listing
 
   const [imgLoaded, setImgLoaded] = useState(false)
+  const [viewed, setViewed] = useState(() => source_id ? readViewed().has(source_id) : false)
+
+  const markViewed = useCallback(() => {
+    if (!source_id || viewed) return
+    const set = readViewed()
+    set.add(source_id)
+    writeViewed(set)
+    setViewed(true)
+  }, [source_id, viewed])
   const placeholderClass = `w-full h-52 bg-slate-100 flex flex-col items-center justify-center text-slate-400 gap-2${photo_url && !imgLoaded ? ' animate-pulse' : ''}`
 
   const priceStr = price ? `$${price.toLocaleString()}` : 'Price N/A'
@@ -52,7 +78,7 @@ export default function PropertyCard({ listing, isGoldStar = false }) {
   return (
     <Card className={`overflow-hidden hover:shadow-md transition-shadow ${isGoldStar ? 'ring-2 ring-amber-400 border-amber-300' : ''}`}>
       {/* Photo */}
-      <a href={source_url || '#'} target="_blank" rel="noopener noreferrer" className="relative block">
+      <a href={source_url || '#'} target="_blank" rel="noopener noreferrer" className="relative block" onClick={markViewed}>
         {photo_url ? (
           <img
             src={photo_url}
@@ -78,6 +104,11 @@ export default function PropertyCard({ listing, isGoldStar = false }) {
         {listing_type && LISTING_TYPE_STYLES[listing_type] && (
           <span className={`absolute bottom-2 left-2 px-2 py-0.5 text-xs rounded-full border font-medium shadow-sm ${LISTING_TYPE_STYLES[listing_type].cls}`}>
             {LISTING_TYPE_STYLES[listing_type].label}
+          </span>
+        )}
+        {viewed && (
+          <span className="absolute bottom-2 right-2 px-2 py-0.5 text-xs rounded-full bg-slate-700/80 text-slate-200 font-medium">
+            Viewed
           </span>
         )}
         {isGoldStar && (
@@ -161,7 +192,7 @@ export default function PropertyCard({ listing, isGoldStar = false }) {
 
         {/* View link */}
         {source_url && (
-          <a href={source_url} target="_blank" rel="noopener noreferrer" className="block">
+          <a href={source_url} target="_blank" rel="noopener noreferrer" className="block" onClick={markViewed}>
             <Button variant="default" className="w-full">
               <ExternalLink size={14} /> View on {source}
             </Button>

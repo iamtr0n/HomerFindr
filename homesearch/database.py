@@ -62,6 +62,11 @@ CREATE TABLE IF NOT EXISTS search_results (
 CREATE INDEX IF NOT EXISTS idx_listings_zip ON listings(zip_code);
 CREATE INDEX IF NOT EXISTS idx_listings_source ON listings(source, source_id);
 CREATE INDEX IF NOT EXISTS idx_listings_price ON listings(price);
+
+CREATE TABLE IF NOT EXISTS viewed_listings (
+    source_id TEXT PRIMARY KEY,
+    viewed_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 """
 
 
@@ -310,6 +315,35 @@ def upsert_listing(listing: Listing) -> tuple[int, Optional[str]]:
         )
         conn.commit()
         return cursor.lastrowid, None
+    finally:
+        conn.close()
+
+
+def mark_viewed(source_id: str) -> None:
+    """Record that a listing was opened in the browser."""
+    conn = get_connection()
+    try:
+        conn.execute(
+            "INSERT OR REPLACE INTO viewed_listings (source_id, viewed_at) VALUES (?, datetime('now'))",
+            (source_id,),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_viewed_source_ids(source_ids: list[str]) -> set[str]:
+    """Return the subset of source_ids that have been viewed."""
+    if not source_ids:
+        return set()
+    conn = get_connection()
+    try:
+        placeholders = ",".join("?" * len(source_ids))
+        rows = conn.execute(
+            f"SELECT source_id FROM viewed_listings WHERE source_id IN ({placeholders})",
+            source_ids,
+        ).fetchall()
+        return {row["source_id"] for row in rows}
     finally:
         conn.close()
 

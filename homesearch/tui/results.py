@@ -152,9 +152,14 @@ def display_results(results: list[Listing], criteria: SearchCriteria, pre_filter
     while True:
         page = results[offset:offset + page_size]
 
+        # Batch lookup which listings on this page have been viewed
+        page_source_ids = [l.source_id for l in page if l.source_id]
+        viewed_ids = db.get_viewed_source_ids(page_source_ids)
+
         choices = []
         for i, l in enumerate(page, offset + 1):
             star = "⭐" if l.is_gold_star else ("★ " if l.is_starred else "  ")
+            viewed = "👁 " if l.source_id in viewed_ids else "   "
             price = f"${l.price:,.0f}" if l.price else "N/A"
             ppsf = f"(${round(l.price / l.sqft):,}/sf)" if l.price and l.sqft else ""
             beds = str(l.bedrooms or "?")
@@ -170,7 +175,7 @@ def display_results(results: list[Listing], criteria: SearchCriteria, pre_filter
                     dom = f" 🔴{l.days_on_mls}d"
                 elif l.days_on_mls >= 31:
                     dom = f" 🟡{l.days_on_mls}d"
-            label = f"{star}  {price:>10} {ppsf:<12}  {beds}bd/{baths}ba  {sqft:<10}  {addr}  {score}{dom}"
+            label = f"{star}{viewed}{price:>10} {ppsf:<12}  {beds}bd/{baths}ba  {sqft:<10}  {addr}  {score}{dom}"
             choices.append(questionary.Choice(title=label, value=i - 1))
 
         # Navigation options
@@ -309,6 +314,8 @@ def _show_detail_card(listing: Listing, max_score: int) -> str:
 
     if action == "open" and listing.source_url:
         webbrowser.open(listing.source_url)
+        if listing.source_id:
+            db.mark_viewed(listing.source_id)
         # Stay on detail card after opening so they can go back
         return _show_detail_card(listing, max_score)
 

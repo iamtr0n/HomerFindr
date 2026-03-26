@@ -68,7 +68,7 @@ async def stream_search(req: SearchRequest):
     loop = asyncio.get_event_loop()
     queue: asyncio.Queue = asyncio.Queue()
 
-    def on_progress(current: int, total: int, location: str):
+    def on_progress(current: int, total: int, location: str, found: int = 0):
         loop.call_soon_threadsafe(
             queue.put_nowait,
             {"type": "progress", "current": current, "total": total, "location": location}
@@ -238,7 +238,10 @@ def search_locations(q: str = ""):
     # Try direct city search first; if no results, use fuzzy find_city candidates
     results = search.by_city(city=city_part, returns=50)
     if not results:
-        candidates = search.find_city(city_part, best_match=False) or []
+        try:
+            candidates = search.find_city(city_part, best_match=False) or []
+        except ValueError:
+            candidates = []
         for candidate in candidates[:5]:
             r = search.by_city(city=candidate, returns=50)
             if r:

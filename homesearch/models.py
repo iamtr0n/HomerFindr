@@ -97,6 +97,9 @@ class Listing(BaseModel):
     longitude: Optional[float] = None
     photo_url: str = ""
     source_url: str = ""
+    match_score: int = 0
+    match_badges: list[str] = Field(default_factory=list)
+    is_gold_star: bool = False
     first_seen_at: Optional[datetime] = None
     last_seen_at: Optional[datetime] = None
 

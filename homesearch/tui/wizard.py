@@ -32,6 +32,33 @@ def _parse_price_range(choice: str) -> tuple[Optional[int], Optional[int]]:
     return mapping.get(choice, (None, None))
 
 
+def _parse_multi_price(selections: list[str]) -> tuple[Optional[int], Optional[int]]:
+    """Combine multiple price range selections into a single (price_min, price_max)."""
+    range_map = {
+        "Under $200k":    (None, 200_000),
+        "$200k - $350k":  (200_000, 350_000),
+        "$350k - $500k":  (350_000, 500_000),
+        "$500k - $750k":  (500_000, 750_000),
+        "$750k - $1M":    (750_000, 1_000_000),
+        "Over $1M":       (1_000_000, None),
+    }
+    mins = []
+    maxes = []
+    for sel in selections:
+        if sel == "Custom range":
+            continue
+        bounds = range_map.get(sel)
+        if bounds:
+            lo, hi = bounds
+            if lo is not None:
+                mins.append(lo)
+            if hi is not None:
+                maxes.append(hi)
+    price_min = min(mins) if mins else None
+    price_max = max(maxes) if maxes else None
+    return price_min, price_max
+
+
 def _parse_sqft_range(choice: str) -> tuple[Optional[int], Optional[int]]:
     """Map square footage label to (sqft_min, sqft_max)."""
     if choice == "Any":
@@ -277,28 +304,47 @@ def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
         console.print("[yellow]No ZIP codes found — searching by location name.[/yellow]")
 
     # ------------------------------------------------------------------
-    # 6. Price Range
+    # 6. Price Range (multi-select)
     # ------------------------------------------------------------------
-    price_answer = questionary.select(
-        "Price range:",
-        choices=[
-            "Any",
-            "Under $100k",
-            "$100k - $200k",
-            "$200k - $300k",
-            "$300k - $400k",
-            "$400k - $500k",
-            "$500k - $750k",
-            "$750k - $1M",
-            "$1M - $1.5M",
-            "Over $1.5M",
-        ],
+    PRICE_RANGES = [
+        "Under $200k",
+        "$200k - $350k",
+        "$350k - $500k",
+        "$500k - $750k",
+        "$750k - $1M",
+        "Over $1M",
+        "Custom range",
+    ]
+    price_answers = questionary.checkbox(
+        "Price range(s):",
+        choices=PRICE_RANGES,
         style=HOUSE_STYLE,
-        instruction="(Enter to skip)",
+        instruction="(Space to select, Enter to confirm)",
     ).ask()
-    if price_answer is None:
+    if price_answers is None:
         return None
-    price_min, price_max = _parse_price_range(price_answer)
+    price_min, price_max = _parse_multi_price(price_answers)
+    if "Custom range" in price_answers:
+        custom_min_str = questionary.text(
+            "Custom minimum price (leave blank for no min):",
+            style=HOUSE_STYLE,
+        ).ask()
+        if custom_min_str is None:
+            return None
+        custom_max_str = questionary.text(
+            "Custom maximum price (leave blank for no max):",
+            style=HOUSE_STYLE,
+        ).ask()
+        if custom_max_str is None:
+            return None
+        try:
+            price_min = int(custom_min_str.strip().replace(",", "").replace("$", "")) if custom_min_str.strip() else None
+        except ValueError:
+            price_min = None
+        try:
+            price_max = int(custom_max_str.strip().replace(",", "").replace("$", "")) if custom_max_str.strip() else None
+        except ValueError:
+            price_max = None
 
     # ------------------------------------------------------------------
     # 7. Bedrooms

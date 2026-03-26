@@ -90,6 +90,20 @@ def run_search(
     # Apply client-side filters for fields not supported by all providers
     filtered = [l for l in deduped if _passes_filters(l, criteria)]
 
+    # Score and sort results
+    perfect = _perfect_score(criteria)
+    for listing in filtered:
+        score, badges = _score_listing(listing, criteria)
+        listing.match_score = score
+        listing.match_badges = badges
+        listing.is_gold_star = score >= perfect and perfect > 0
+
+    filtered.sort(key=lambda l: (
+        -(1 if l.is_gold_star else 0),
+        -l.match_score,
+        l.price or float('inf'),
+    ))
+
     # If search_id provided, persist results
     if search_id is not None:
         previous_ids = db.get_previous_listing_ids(search_id)
@@ -139,6 +153,81 @@ def _listing_quality(listing: Listing) -> int:
     if listing.source == "realtor":
         score += 2  # Prefer MLS data
     return score
+
+
+def _score_listing(listing: Listing, criteria: SearchCriteria) -> tuple[int, list[str]]:
+    """Score a listing by how many optional criteria it satisfies. Returns (score, badges)."""
+    badges = []
+
+    if criteria.has_garage is True and listing.has_garage is True:
+        badges.append("garage")
+
+    if criteria.has_basement is True and listing.has_basement is True:
+        badges.append("basement")
+
+    if criteria.has_pool is True and listing.has_pool is True:
+        badges.append("pool")
+
+    if criteria.has_fireplace is True and listing.has_fireplace is True:
+        badges.append("fireplace")
+
+    if criteria.has_ac is True and listing.has_ac is True:
+        badges.append("A/C")
+
+    if criteria.hoa_max is not None and listing.hoa_monthly is not None and listing.hoa_monthly <= criteria.hoa_max:
+        if listing.hoa_monthly == 0:
+            badges.append("no HOA")
+        else:
+            badges.append(f"HOA ${listing.hoa_monthly:.0f}")
+
+    if (criteria.bedrooms_min and listing.bedrooms and listing.bedrooms >= criteria.bedrooms_min
+            and criteria.bathrooms_min and listing.bathrooms and listing.bathrooms >= criteria.bathrooms_min):
+        badges.append(f"{listing.bedrooms}bd/{listing.bathrooms}ba \u2713")
+
+    if criteria.price_min is not None or criteria.price_max is not None:
+        price_ok = True
+        if criteria.price_min is not None and (not listing.price or listing.price < criteria.price_min):
+            price_ok = False
+        if criteria.price_max is not None and (not listing.price or listing.price > criteria.price_max):
+            price_ok = False
+        if price_ok and listing.price:
+            badges.append("price \u2713")
+
+    if criteria.year_built_min and listing.year_built and listing.year_built >= criteria.year_built_min:
+        if listing.year_built >= 2020:
+            badges.append("new build")
+
+    if criteria.heat_type and criteria.heat_type != "any" and listing.heat_type == criteria.heat_type:
+        badges.append(listing.heat_type)
+
+    score = len(badges)
+    return score, badges
+
+
+def _perfect_score(criteria: SearchCriteria) -> int:
+    """Count the number of optional criteria that can contribute to the score."""
+    count = 0
+    if criteria.has_garage is True:
+        count += 1
+    if criteria.has_basement is True:
+        count += 1
+    if criteria.has_pool is True:
+        count += 1
+    if criteria.has_fireplace is True:
+        count += 1
+    if criteria.has_ac is True:
+        count += 1
+    if criteria.hoa_max is not None:
+        count += 1
+    if criteria.bedrooms_min and criteria.bathrooms_min:
+        count += 1
+    if criteria.price_min is not None or criteria.price_max is not None:
+        count += 1
+    if criteria.year_built_min:
+        count += 1
+    if criteria.heat_type and criteria.heat_type != "any":
+        count += 1
+    return max(count, 1)
 
 
 def _passes_filters(listing: Listing, criteria: SearchCriteria) -> bool:

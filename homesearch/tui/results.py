@@ -156,57 +156,85 @@ def display_results(results: list[Listing], criteria: SearchCriteria, pre_filter
         )
     )
 
-    # D-13: Colored table
-    table = Table(
-        show_header=True,
-        header_style="bold",
-        show_lines=True,
-        expand=False,
-        row_styles=["", "dim"],
-    )
-    table.add_column("#", style="dim", width=4)
-    table.add_column("Address", style=COLOR_ADDRESS, min_width=28, no_wrap=True)
-    table.add_column("Price", style=COLOR_PRICE, justify="right", width=12)
-    table.add_column("Bed/Ba", style=COLOR_BEDS_BATHS, justify="center", width=8)
-    table.add_column("SqFt", style=COLOR_SQFT, justify="right", width=8)
-    table.add_column("Year", style="dim", justify="center", width=6)
-    table.add_column("Source", style="dim", width=10)
+    # D-13: Colored table with pagination
+    max_score = max((l.match_score for l in results), default=0)
+    page_size = 50
+    offset = 0
 
-    display = results[:50]
-    for i, listing in enumerate(display, 1):
-        price_str = f"${listing.price:,.0f}" if listing.price else "\u2014"
-        bed_bath = f"{listing.bedrooms or '?'}/{listing.bathrooms or '?'}"
-        sqft_str = f"{listing.sqft:,}" if listing.sqft else "\u2014"
-        addr = listing.address[:40] + ("\u2026" if len(listing.address) > 40 else "")
-        table.add_row(
-            str(i), addr, price_str, bed_bath, sqft_str,
-            str(listing.year_built or "\u2014"), listing.source,
-        )
-
-    console.print(table)
-
-    if len(results) > 50:
-        console.print(f"[dim]Showing 50 of {len(results)} results.[/dim]")
-
-    # D-15: Arrow-key result selection to open URL
-    url_choices = []
+    # Build full url_map across all results (not just current page)
     url_map = {}
-    for i, listing in enumerate(display, 1):
+    for i, listing in enumerate(results, 1):
         if listing.source_url:
             label = f"{i}. {listing.address[:40]}"
-            url_choices.append(label)
             url_map[label] = listing.source_url
 
+    while offset < len(results):
+        page = results[offset:offset + page_size]
+
+        table = Table(
+            show_header=True,
+            header_style="bold",
+            show_lines=True,
+            expand=False,
+            row_styles=["", "dim"],
+        )
+        table.add_column("#", style="dim", width=4)
+        table.add_column("\u2605", justify="center", width=3)
+        table.add_column("Address", style=COLOR_ADDRESS, min_width=28, no_wrap=True)
+        table.add_column("Price", style=COLOR_PRICE, justify="right", width=12)
+        table.add_column("Bed/Ba", style=COLOR_BEDS_BATHS, justify="center", width=8)
+        table.add_column("SqFt", style=COLOR_SQFT, justify="right", width=8)
+        table.add_column("Year", style="dim", justify="center", width=6)
+        table.add_column("Score", justify="center", width=10)
+        table.add_column("Badges", width=24)
+        table.add_column("Source", style="dim", width=10)
+
+        for i, listing in enumerate(page, offset + 1):
+            price_str = f"${listing.price:,.0f}" if listing.price else "\u2014"
+            bed_bath = f"{listing.bedrooms or '?'}/{listing.bathrooms or '?'}"
+            sqft_str = f"{listing.sqft:,}" if listing.sqft else "\u2014"
+            addr = listing.address[:40] + ("\u2026" if len(listing.address) > 40 else "")
+            star = "\u2b50" if listing.is_gold_star else " "
+            score_label = f"{listing.match_score}/{max_score}"
+            if listing.is_gold_star and max_score > 0:
+                score_label += " \u2b50"
+            badges_str = " \u00b7 ".join(listing.match_badges)
+            if len(badges_str) > 22:
+                badges_str = badges_str[:21] + "\u2026"
+            table.add_row(
+                str(i), star, addr, price_str, bed_bath, sqft_str,
+                str(listing.year_built or "\u2014"),
+                score_label, badges_str, listing.source,
+            )
+
+        console.print(table)
+        offset += page_size
+
+        if offset < len(results):
+            more = questionary.select(
+                f"Showing {min(offset, len(results))} of {len(results)} \u2014 Show 50 more?",
+                choices=["Yes", "No"],
+                style=HOUSE_STYLE,
+            ).ask()
+            if not more or more == "No":
+                break
+
+    # D-15: Arrow-key result selection to open URL — loops back after opening
+    url_choices = list(url_map.keys())
     if url_choices:
         url_choices.append("\u21a9  Back to menu")
-        pick = questionary.select(
-            "Select a listing to open in browser:",
-            choices=url_choices,
-            style=HOUSE_STYLE,
-        ).ask()
+        while True:
+            pick = questionary.select(
+                "Select a listing to open in browser:",
+                choices=url_choices,
+                style=HOUSE_STYLE,
+            ).ask()
 
-        if pick and "Back to menu" not in pick and pick in url_map:
-            webbrowser.open(url_map[pick])
+            if not pick or "Back to menu" in pick:
+                break
+            if pick in url_map:
+                webbrowser.open(url_map[pick])
+            # Loop back to show the same select prompt
 
     # D-16: Save this search?
     _offer_save_search(criteria)

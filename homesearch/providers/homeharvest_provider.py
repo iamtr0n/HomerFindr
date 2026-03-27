@@ -222,6 +222,19 @@ class HomeHarvestProvider(BaseProvider):
             elif listing_type == "pending":
                 lt = "pending"
 
+            # Override with the actual MLS status from the row — homeharvest can return
+            # PENDING/CONTINGENT listings inside a for_sale query; without this they'd be
+            # incorrectly tagged as "sale" and slip past the listing_type safety net.
+            row_status = str(row.get("status") or "").upper().strip()
+            if row_status in ("PENDING", "CONTINGENT", "UNDER_CONTRACT"):
+                lt = "pending"
+            elif row_status == "COMING_SOON":
+                lt = "coming_soon"
+            elif row_status == "FOR_RENT":
+                lt = "rent"
+            elif row_status == "SOLD":
+                lt = "sold"
+
             return Listing(
                 source="realtor",
                 source_id=source_id,

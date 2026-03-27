@@ -42,7 +42,7 @@ function writeViewed(set) {
   } catch {}
 }
 
-export default function PropertyCard({ listing, isGoldStar = false }) {
+export default function PropertyCard({ listing, isGoldStar = false, isViewed = false }) {
   const {
     address, city, state, price, bedrooms, bathrooms, sqft, year_built,
     has_garage, has_basement, stories, hoa_monthly, photo_url, source_url,
@@ -75,8 +75,10 @@ export default function PropertyCard({ listing, isGoldStar = false }) {
   const locationStr = [city, state].filter(Boolean).join(', ')
   const fullLocation = [locationStr, zip_code].filter(Boolean).join(' ')
 
+  const isViewedState = isViewed || viewed
+
   return (
-    <Card className={`overflow-hidden hover:shadow-md transition-shadow ${isGoldStar ? 'ring-2 ring-amber-400 border-amber-300' : ''}`}>
+    <Card className={`overflow-hidden hover:shadow-md transition-shadow ${isGoldStar ? 'ring-2 ring-amber-400 border-amber-300' : ''} ${isViewedState ? 'opacity-50' : ''}`}>
       {/* Photo */}
       <a href={source_url || '#'} target="_blank" rel="noopener noreferrer" className="relative block" onClick={markViewed}>
         {photo_url ? (
@@ -106,7 +108,7 @@ export default function PropertyCard({ listing, isGoldStar = false }) {
             {LISTING_TYPE_STYLES[listing_type].label}
           </span>
         )}
-        {viewed && (
+        {isViewedState && (
           <span className="absolute bottom-2 right-2 px-2 py-0.5 text-xs rounded-full bg-slate-700/80 text-slate-200 font-medium">
             Viewed
           </span>

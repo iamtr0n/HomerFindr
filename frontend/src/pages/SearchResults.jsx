@@ -6,11 +6,21 @@ import { Button } from '../components/ui/Button'
 import { ArrowLeft, Play, Loader2, Filter, DollarSign } from 'lucide-react'
 import { useState } from 'react'
 
+function readViewedIds() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem('homerfindr_viewed') || '[]'))
+  } catch {
+    return new Set()
+  }
+}
+
 export default function SearchResults() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [showNewOnly, setShowNewOnly] = useState(false)
   const [sortBy, setSortBy] = useState('match_score')
+  const [hideViewed, setHideViewed] = useState(false)
+  const [viewedIds] = useState(() => readViewedIds())
   const [filterMinPrice, setFilterMinPrice] = useState('')
   const [filterMaxPrice, setFilterMaxPrice] = useState('')
   const [filterMinBeds, setFilterMinBeds] = useState('')
@@ -46,19 +56,26 @@ export default function SearchResults() {
     if (filterMaxPrice) list = list.filter(l => !l.price || l.price <= +filterMaxPrice)
     if (filterMinBeds) list = list.filter(l => (l.bedrooms || 0) >= +filterMinBeds)
     if (filterMinBaths) list = list.filter(l => (l.bathrooms || 0) >= +filterMinBaths)
+    if (hideViewed) list = list.filter(l => !viewedIds.has(l.source_id))
     // Apply sort
     switch (sortBy) {
-      case 'match_score': return list.sort((a, b) => {
+      case 'match_score': list.sort((a, b) => {
         const scoreDiff = (b.match_score || 0) - (a.match_score || 0)
         if (scoreDiff !== 0) return scoreDiff
         return (b.is_gold_star ? 1 : 0) - (a.is_gold_star ? 1 : 0)
-      })
-      case 'price_asc': return list.sort((a, b) => (a.price || 0) - (b.price || 0))
-      case 'price_desc': return list.sort((a, b) => (b.price || 0) - (a.price || 0))
-      case 'sqft_desc': return list.sort((a, b) => (b.sqft || 0) - (a.sqft || 0))
-      case 'newest': return list.sort((a, b) => (b.year_built || 0) - (a.year_built || 0))
-      default: return list
+      }); break
+      case 'price_asc': list.sort((a, b) => (a.price || 0) - (b.price || 0)); break
+      case 'price_desc': list.sort((a, b) => (b.price || 0) - (a.price || 0)); break
+      case 'sqft_desc': list.sort((a, b) => (b.sqft || 0) - (a.sqft || 0)); break
+      case 'newest': list.sort((a, b) => (b.year_built || 0) - (a.year_built || 0)); break
     }
+    // Push viewed listings to bottom (preserves primary sort within each group)
+    if (!hideViewed && viewedIds.size > 0) {
+      const unviewed = list.filter(l => !viewedIds.has(l.source_id))
+      const viewed = list.filter(l => viewedIds.has(l.source_id))
+      list = [...unviewed, ...viewed]
+    }
+    return list
   }
 
   return (
@@ -112,6 +129,18 @@ export default function SearchResults() {
         >
           New only
         </button>
+
+        {/* Hide viewed toggle */}
+        {viewedIds.size > 0 && (
+          <button
+            onClick={() => setHideViewed(!hideViewed)}
+            className={`text-sm px-3 py-1 rounded-full border ${
+              hideViewed ? 'bg-slate-100 border-slate-400 text-slate-700' : 'border-slate-200 text-slate-500'
+            }`}
+          >
+            {hideViewed ? `Show viewed (${viewedIds.size})` : `Hide viewed (${viewedIds.size})`}
+          </button>
+        )}
 
         {/* Price range inputs */}
         <div className="flex items-center gap-1">
@@ -199,7 +228,11 @@ export default function SearchResults() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredAndSorted().map((listing, i) => (
-            <PropertyCard key={`${listing.source}-${listing.source_id}-${i}`} listing={listing} />
+            <PropertyCard
+              key={`${listing.source}-${listing.source_id}-${i}`}
+              listing={listing}
+              isViewed={viewedIds.has(listing.source_id)}
+            />
           ))}
         </div>
       )}

@@ -145,21 +145,24 @@ def display_results(results: list[Listing], criteria: SearchCriteria, pre_filter
         )
     )
 
+    # Load viewed IDs for full result set and push viewed listings to bottom
+    all_source_ids = [l.source_id for l in results if l.source_id]
+    viewed_ids = db.get_viewed_source_ids(all_source_ids)
+    results.sort(key=lambda l: 1 if l.source_id in viewed_ids else 0)
+
     # Build selector choices — show key info on each line
     page_size = 50
     offset = 0
+    hide_viewed = False
 
     while True:
-        page = results[offset:offset + page_size]
-
-        # Batch lookup which listings on this page have been viewed
-        page_source_ids = [l.source_id for l in page if l.source_id]
-        viewed_ids = db.get_viewed_source_ids(page_source_ids)
+        active = [l for l in results if l.source_id not in viewed_ids] if hide_viewed else results
+        page = active[offset:offset + page_size]
 
         choices = []
         for i, l in enumerate(page, offset + 1):
             star = "⭐" if l.is_gold_star else ("★ " if l.is_starred else "  ")
-            viewed = "👁 " if l.source_id in viewed_ids else "   "
+            viewed_mark = "👁 " if l.source_id in viewed_ids else "   "
             price = f"${l.price:,.0f}" if l.price else "N/A"
             ppsf = f"(${round(l.price / l.sqft):,}/sf)" if l.price and l.sqft else ""
             beds = str(l.bedrooms or "?")
@@ -175,17 +178,20 @@ def display_results(results: list[Listing], criteria: SearchCriteria, pre_filter
                     dom = f" 🔴{l.days_on_mls}d"
                 elif l.days_on_mls >= 31:
                     dom = f" 🟡{l.days_on_mls}d"
-            label = f"{star}{viewed}{price:>10} {ppsf:<12}  {beds}bd/{baths}ba  {sqft:<10}  {addr}  {score}{dom}"
+            label = f"{star}{viewed_mark}{price:>10} {ppsf:<12}  {beds}bd/{baths}ba  {sqft:<10}  {addr}  {score}{dom}"
             choices.append(questionary.Choice(title=label, value=i - 1))
 
         # Navigation options
-        if offset + page_size < len(results):
-            choices.append(questionary.Choice(title=f"   ↓  Load 50 more  ({len(results) - offset - page_size} remaining)", value="more"))
+        if offset + page_size < len(active):
+            choices.append(questionary.Choice(title=f"   ↓  Load 50 more  ({len(active) - offset - page_size} remaining)", value="more"))
+        if viewed_ids:
+            viewed_label = f"   👁  Show viewed ({len(viewed_ids)})" if hide_viewed else f"   👁  Hide viewed ({len(viewed_ids)})"
+            choices.append(questionary.Choice(title=viewed_label, value="toggle_viewed"))
         choices.append(questionary.Choice(title="   ↩  New search", value="new_search"))
         choices.append(questionary.Choice(title="   ←  Back to main menu", value="exit"))
 
         pick = questionary.select(
-            f"Select a listing to view details  ({len(results)} total):",
+            f"Select a listing to view details  ({len(active)} shown):",
             choices=choices,
             style=HOUSE_STYLE,
         ).ask()
@@ -199,22 +205,31 @@ def display_results(results: list[Listing], criteria: SearchCriteria, pre_filter
         if pick == "more":
             offset += page_size
             continue
+        if pick == "toggle_viewed":
+            hide_viewed = not hide_viewed
+            offset = 0
+            continue
 
         # Show detail card for the selected listing
-        listing = results[pick]
-        action = _show_detail_card(listing, max_score)
+        listing = active[pick]
+        action = _show_detail_card(listing, max_score, hide_viewed)
 
         if action == "new_search":
             return True
         if action == "exit":
             return False
+        if action == "hide_viewed":
+            hide_viewed = True
+            viewed_ids = db.get_viewed_source_ids(all_source_ids)
+            offset = 0
+            continue
         # action == "back" → loop back to selector
 
     return False
 
 
-def _show_detail_card(listing: Listing, max_score: int) -> str:
-    """Show full listing detail. Returns 'back', 'new_search', or 'exit'."""
+def _show_detail_card(listing: Listing, max_score: int, hide_viewed: bool = False) -> str:
+    """Show full listing detail. Returns 'back', 'new_search', 'exit', or 'hide_viewed'."""
     star = "⭐ Perfect Match  " if listing.is_gold_star else ""
     title = f"{star}{listing.address}"
 
@@ -303,6 +318,8 @@ def _show_detail_card(listing: Listing, max_score: int) -> str:
     if listing.source_url:
         action_choices.append(questionary.Choice(title="🔗  Open in browser", value="open"))
     action_choices.append(questionary.Choice(title="←  Back to results", value="back"))
+    if not hide_viewed:
+        action_choices.append(questionary.Choice(title="🚫  Hide viewed listings", value="hide_viewed"))
     action_choices.append(questionary.Choice(title="🔍  New search", value="new_search"))
     action_choices.append(questionary.Choice(title="✕  Exit", value="exit"))
 

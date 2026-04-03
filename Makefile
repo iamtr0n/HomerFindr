@@ -139,6 +139,13 @@ release:
 	@echo "✓ Tag pushed → GitHub Actions will build Mac + Windows installers"
 	@echo "  https://github.com/iamtr0n/HomerFindr/actions"
 
+# ── Launchers: ensure .command is executable (run after git clone) ─────────────
+launchers:
+	chmod +x packaging/HomerFindr-Install.command
+	@echo "✓ Launcher files ready in packaging/"
+	@echo "  Mac:     packaging/HomerFindr-Install.command  (AirDrop / email)"
+	@echo "  Windows: packaging/HomerFindr-Install.bat      (email / USB)"
+
 # ── Clean build artifacts ─────────────────────────────────────────────────────
 clean:
 	rm -rf frontend/dist frontend/node_modules __pycache__ homesearch.egg-info
@@ -158,6 +165,7 @@ help:
 	@echo "  make list-backups       Show all backups on disk"
 	@echo "  make backup-push        Backup + upload to GitHub releases/backups"
 	@echo "  make restore-github     Download latest GitHub backup and restore"
+	@echo "  make launchers          Ensure launcher files are executable"
 	@echo "  make release V=x.y.z    Tag release + snapshot backup to GitHub"
 	@echo "  make clean              Remove build artifacts"
 	@echo ""

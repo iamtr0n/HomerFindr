@@ -71,6 +71,8 @@ jobs:
           files: |
             install.sh
             install.ps1
+            packaging/HomerFindr-Install.command
+            packaging/HomerFindr-Install.bat
             homebrew-formula/homerfindr.rb
           draft: false
           prerelease: false

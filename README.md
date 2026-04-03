@@ -889,4 +889,6 @@ Made with ☕ for house hunters who hate missing listings.
 
 **[⭐ Star this repo](https://github.com/iamtr0n/HomerFindr)** if HomerFindr helped you find a home.
 
+Good luck with the house hunt! 🏠
+
 </div>

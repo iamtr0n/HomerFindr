@@ -223,30 +223,19 @@ if [[ "$SETUP_SMS" =~ ^[Yy]$ ]]; then
   echo "  ├─────────────────────────────────────────────────────────────────┤"
   cat << ZAPIER_PROMPT
 
-  Create a Zap with these exact settings:
+  Create and publish a Zap:
 
-  TRIGGER:
-  - App: Webhooks by Zapier
-  - Event: Catch Hook
-  - (Copy the webhook URL it generates — you will need it in a moment)
+  1. Trigger: Webhooks by Zapier - Catch Hook (JSON)
 
-  ACTION:
-  - App: SMS by Zapier
-  - Event: Send SMS
-  - To: ${PHONE_NUMBER}
-  - Message:
-    🏠 HomerFindr Alert
-    {{new_count}} new home(s) for "{{search_name}}"
+  2. Action: SMS by Zapier - Send SMS
+     - To: ${PHONE_NUMBER}
+     - From: 650-646-9270 (fixed, not random)
+     - Message: Map the 'message' field directly from the webhook
 
-    📍 {{listings__1__address}}
-    💰 \${{listings__1__price}}
-    🛏 {{listings__1__beds}} bed / {{listings__1__baths}} bath
-    📐 {{listings__1__sqft}} sqft
-    🔗 {{listings__1__url}}
-
-    Open HomerFindr: http://127.0.0.1:8000
-
-  Turn the Zap ON when done.
+  Map: webhook message field → SMS message body
+  Authentication: SMS by Zapier account
+  Name: HomerFindr SMS Alert
+  Then publish it.
 
 ZAPIER_PROMPT
   echo "  └─────────────────────────────────────────────────────────────────┘"

@@ -186,7 +186,30 @@ Write-Host ""
 $sms = Read-Host "  Set up SMS alerts now? (y/n)"
 
 if ($sms -match "^[Yy]") {
-    $webhook = Read-Host "  Paste your Zapier webhook URL"
+    $phone = Read-Host "  Your phone number (e.g. +12125551234)"
+    Write-Host ""
+    Write-Host "  Step 1 — Go to https://zapier.com/sign-up (free, no credit card)" -ForegroundColor Cyan
+    Write-Host "  Step 2 — Click Create → New Zap" -ForegroundColor Cyan
+    Write-Host "  Step 3 — Paste this prompt into Zapier's AI box:" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "  ┌──────────────────────────────────────────────────────────────┐" -ForegroundColor DarkGray
+    Write-Host "  Create and publish a Zap:" -ForegroundColor White
+    Write-Host ""
+    Write-Host "  1. Trigger: Webhooks by Zapier - Catch Hook (JSON)" -ForegroundColor White
+    Write-Host "  2. Action: SMS by Zapier - Send SMS" -ForegroundColor White
+    Write-Host "     - To: $phone" -ForegroundColor White
+    Write-Host "     - From: 650-646-9270 (fixed, not random)" -ForegroundColor White
+    Write-Host "     - Message: Map the 'message' field directly from the webhook" -ForegroundColor White
+    Write-Host ""
+    Write-Host "  Map: webhook message field -> SMS message body" -ForegroundColor White
+    Write-Host "  Authentication: SMS by Zapier account" -ForegroundColor White
+    Write-Host "  Name: HomerFindr SMS Alert" -ForegroundColor White
+    Write-Host "  Then publish it." -ForegroundColor White
+    Write-Host "  └──────────────────────────────────────────────────────────────┘" -ForegroundColor DarkGray
+    Write-Host ""
+    Write-Host "  Step 4 — Copy the Catch Hook URL Zapier gives you, paste it below:" -ForegroundColor Cyan
+    Write-Host ""
+    $webhook = Read-Host "  Zapier webhook URL"
     if ($webhook) {
         Add-Content ".env" "`nZAPIER_WEBHOOK_URL=$webhook"
         Write-OK "Webhook saved. Restart HomerFindr to apply."

@@ -136,6 +136,8 @@ The web dashboard is a React app served by the local FastAPI backend. Open it at
 
 ### Dashboard
 
+![HomerFindr Dashboard](docs/screenshots/dashboard.png)
+
 The home screen organizes listings into four sections — a listing only appears in one section at a time (highest priority first):
 
 | Section | What's here |
@@ -157,6 +159,8 @@ Each listing card shows:
 ---
 
 ### New Search
+
+![New Search Form](docs/screenshots/new-search.png)
 
 A full-featured search form with every filter exposed:
 
@@ -204,6 +208,8 @@ Search results stream in live with a progress terminal showing which ZIP codes a
 
 ### Search Results
 
+![Search Results](docs/screenshots/search-results.png)
+
 After a search runs, results are ranked by match score with the best listings first. You can filter further with inline controls:
 
 - **Price range slider** — narrow results without re-running the search
@@ -217,11 +223,15 @@ Each result shows the full listing card with all badges, plus a direct link to t
 
 ### Map View
 
+![Map View](docs/screenshots/map-view.png)
+
 Draw a polygon on an interactive map to define a custom search area. HomerFindr finds all ZIP codes within the polygon and runs a search. Useful for targeting a specific neighborhood, school district, or commute zone without knowing ZIP codes.
 
 ---
 
 ### Mortgage Calculator
+
+![Mortgage Calculator](docs/screenshots/mortgage-calculator.png)
 
 A toolbar that sits above the results. Toggle it on to see estimated monthly payments on every listing card.
 
@@ -241,7 +251,15 @@ Settings persist across sessions in `localStorage`.
 
 ---
 
+### Listing Cards
+
+![Listing Cards](docs/screenshots/listing-cards.png)
+
+---
+
 ### Settings
+
+![Settings](docs/screenshots/settings.png)
 
 Configure notifications and integrations:
 
@@ -405,6 +423,160 @@ Or if you cloned the repo:
 ```bash
 make update
 ```
+
+---
+
+## ☁️ Deploy to the Web
+
+> **Don't want to run HomerFindr on your own machine?** You can host it on a cloud server so it's always running — accessible from any browser, anywhere, without your computer needing to be on.
+
+HomerFindr is a standard Python + React app that runs on any Linux VPS or cloud platform. The steps are the same regardless of provider.
+
+---
+
+### What You'll Need
+
+- A server running **Ubuntu 22.04+** (or any modern Linux)
+- Python 3.11+, Node.js, and Git installed on it
+- A domain name (optional, but nice) or just the server's IP address
+
+Cloud servers cost **$4–$10/month**. Good options:
+
+| Provider | Cheapest Plan | Notes |
+|----------|--------------|-------|
+| [DigitalOcean](https://digitalocean.com) | $6/mo Droplet | Most beginner-friendly |
+| [Hetzner](https://hetzner.com) | €4/mo VPS | Best price/performance |
+| [Vultr](https://vultr.com) | $6/mo Cloud Compute | Simple UI |
+| [Linode (Akamai)](https://linode.com) | $5/mo | Solid, reliable |
+| [Fly.io](https://fly.io) | Free tier available | Container-based, no root SSH |
+| [Railway](https://railway.app) | Free tier available | Push-to-deploy, easiest of all |
+
+---
+
+### Option A — VPS / Cloud Server (Recommended)
+
+SSH into your server, then run the same macOS installer:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/iamtr0n/HomerFindr/main/install.sh | bash
+```
+
+This installs HomerFindr to `~/HomerFindr`, sets up the Python environment, builds the frontend, and registers a service that starts at boot.
+
+**Make it accessible from the internet:**
+
+By default HomerFindr binds to `127.0.0.1` (localhost only). Edit `.env` to listen on all interfaces:
+
+```bash
+nano ~/HomerFindr/.env
+```
+
+Change:
+```
+HOST=127.0.0.1
+```
+To:
+```
+HOST=0.0.0.0
+```
+
+Then restart:
+```bash
+launchctl unload ~/Library/LaunchAgents/com.homerfindr.plist
+launchctl load  ~/Library/LaunchAgents/com.homerfindr.plist
+```
+
+On Linux (systemd instead of launchd), restart with:
+```bash
+sudo systemctl restart homerfindr
+# or if you ran it directly:
+pkill -f "homesearch serve" && homesearch serve &
+```
+
+Open port 8000 in your server's firewall:
+```bash
+sudo ufw allow 8000
+```
+
+HomerFindr is now accessible at `http://YOUR_SERVER_IP:8000`.
+
+---
+
+### Option B — Railway (Easiest, no server management)
+
+Railway deploys directly from your GitHub repo with zero server management.
+
+1. Fork this repo to your GitHub account
+2. Go to [railway.app](https://railway.app) → **New Project** → **Deploy from GitHub**
+3. Select your fork
+4. In **Settings → Variables**, add:
+   ```
+   HOST=0.0.0.0
+   PORT=8000
+   ```
+5. In **Settings → Start Command**, set:
+   ```
+   homesearch serve
+   ```
+6. Railway gives you a public URL like `https://homerfindr-production.up.railway.app`
+
+> Railway's free tier has usage limits (~500 hours/month). A $5/mo plan is unlimited.
+
+---
+
+### Option C — Add a Domain + HTTPS (Optional but Recommended)
+
+If you're running on a VPS, you can put Nginx in front of HomerFindr to get a real domain and HTTPS (free with Let's Encrypt).
+
+**Install Nginx and Certbot:**
+```bash
+sudo apt install nginx certbot python3-certbot-nginx -y
+```
+
+**Create an Nginx config** at `/etc/nginx/sites-available/homerfindr`:
+```nginx
+server {
+    listen 80;
+    server_name yourdomain.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+```
+
+**Enable and get HTTPS:**
+```bash
+sudo ln -s /etc/nginx/sites-available/homerfindr /etc/nginx/sites-enabled/
+sudo certbot --nginx -d yourdomain.com
+sudo systemctl reload nginx
+```
+
+HomerFindr now runs at `https://yourdomain.com` with a valid SSL certificate that auto-renews.
+
+---
+
+### Security Note
+
+HomerFindr has **no built-in authentication**. If you expose it publicly, anyone who finds the URL can see your searches and listings.
+
+**Quick password protection with Nginx:**
+```bash
+sudo apt install apache2-utils -y
+sudo htpasswd -c /etc/nginx/.htpasswd yourusername
+```
+
+Add to your Nginx `location /` block:
+```nginx
+auth_basic "HomerFindr";
+auth_basic_user_file /etc/nginx/.htpasswd;
+```
+
+Then `sudo systemctl reload nginx`. Your browser will prompt for a username and password before showing the dashboard.
 
 ---
 

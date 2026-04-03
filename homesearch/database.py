@@ -67,6 +67,47 @@ CREATE TABLE IF NOT EXISTS viewed_listings (
     source_id TEXT PRIMARY KEY,
     viewed_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS pending_alerts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    search_id INTEGER,
+    search_name TEXT NOT NULL,
+    webhook_url TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    attempts INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS listing_price_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    listing_id INTEGER NOT NULL,
+    old_price REAL,
+    new_price REAL,
+    changed_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (listing_id) REFERENCES listings(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_price_history_listing ON listing_price_history(listing_id, changed_at DESC);
+
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id TEXT PRIMARY KEY,
+    endpoint TEXT NOT NULL,
+    p256dh TEXT NOT NULL,
+    auth TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS dismissed_listings (
+    source_id TEXT NOT NULL,
+    session_id TEXT NOT NULL DEFAULT 'default',
+    dismissed_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (source_id, session_id)
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 """
 
 
@@ -111,17 +152,56 @@ def init_db():
         conn.commit()
     except Exception:
         pass  # Column already exists
+    # Add session_id to saved_searches
+    try:
+        conn.execute("ALTER TABLE saved_searches ADD COLUMN session_id TEXT DEFAULT 'default'")
+        conn.commit()
+    except Exception:
+        pass
+    # Ensure sessions table exists (idempotent)
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS sessions (
+            id TEXT PRIMARY KEY,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE TABLE IF NOT EXISTS dismissed_listings (
+            source_id TEXT NOT NULL,
+            session_id TEXT NOT NULL DEFAULT 'default',
+            dismissed_at TEXT NOT NULL DEFAULT (datetime('now')),
+            PRIMARY KEY (source_id, session_id)
+        );
+    """)
+    conn.commit()
+    # Create price history table for existing databases
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS listing_price_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            listing_id INTEGER NOT NULL,
+            old_price REAL,
+            new_price REAL,
+            changed_at TEXT NOT NULL DEFAULT (datetime('now')),
+            FOREIGN KEY (listing_id) REFERENCES listings(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_price_history_listing ON listing_price_history(listing_id, changed_at DESC);
+    """)
+    # Add days_on_mls column
+    try:
+        conn.execute("ALTER TABLE listings ADD COLUMN days_on_mls INTEGER")
+        conn.commit()
+    except Exception:
+        pass
+    conn.commit()
     conn.close()
 
 
 # --- Saved Searches ---
 
-def save_search(search: SavedSearch) -> int:
+def save_search(search: SavedSearch, session_id: str = "default") -> int:
     conn = get_connection()
     try:
         cursor = conn.execute(
-            "INSERT INTO saved_searches (name, criteria_json, is_active) VALUES (?, ?, ?)",
-            (search.name, search.criteria.model_dump_json(), int(search.is_active)),
+            "INSERT INTO saved_searches (name, criteria_json, is_active, session_id) VALUES (?, ?, ?, ?)",
+            (search.name, search.criteria.model_dump_json(), int(search.is_active), session_id),
         )
         conn.commit()
         return cursor.lastrowid
@@ -129,10 +209,18 @@ def save_search(search: SavedSearch) -> int:
         conn.close()
 
 
-def get_saved_searches(active_only: bool = False) -> list[SavedSearch]:
+def get_saved_searches(active_only: bool = False, session_id: Optional[str] = None) -> list[SavedSearch]:
     conn = get_connection()
     try:
-        query = """
+        conditions = []
+        params = []
+        if active_only:
+            conditions.append("ss.is_active = 1")
+        if session_id is not None:
+            conditions.append("ss.session_id = ?")
+            params.append(session_id)
+        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+        query = f"""
             SELECT ss.*,
                    COALESCE((
                        SELECT COUNT(*)
@@ -140,11 +228,10 @@ def get_saved_searches(active_only: bool = False) -> list[SavedSearch]:
                        WHERE sr.search_id = ss.id
                    ), 0) AS result_count
             FROM saved_searches ss
+            {where}
+            ORDER BY ss.created_at DESC
         """
-        if active_only:
-            query += " WHERE ss.is_active = 1"
-        query += " ORDER BY ss.created_at DESC"
-        rows = conn.execute(query).fetchall()
+        rows = conn.execute(query, params).fetchall()
         results = []
         for row in rows:
             results.append(SavedSearch(
@@ -268,26 +355,44 @@ def delete_search(search_id: int):
 
 # --- Listings ---
 
-def upsert_listing(listing: Listing) -> tuple[int, Optional[str]]:
-    """Insert or update a listing. Returns (listing_id, previous_listing_type).
-    previous_listing_type is None for new listings, or the old value when the listing
-    already existed (useful for detecting status changes like sale → pending).
+def upsert_listing(listing: Listing) -> tuple[int, Optional[str], Optional[float]]:
+    """Insert or update a listing. Returns (listing_id, previous_listing_type, previous_price).
+    previous_listing_type and previous_price are None for new listings, or the old values
+    when the listing already existed (useful for detecting status changes and price drops).
     """
     conn = get_connection()
     try:
         existing = conn.execute(
-            "SELECT id, listing_type FROM listings WHERE source = ? AND source_id = ?",
+            "SELECT id, listing_type, price FROM listings WHERE source = ? AND source_id = ?",
             (listing.source, listing.source_id),
         ).fetchone()
 
         if existing:
             prev_type = existing["listing_type"]
+            prev_price = existing["price"]
             conn.execute(
-                "UPDATE listings SET price=?, listing_type=?, last_seen_at=datetime('now'), photo_url=?, source_url=? WHERE id=?",
-                (listing.price, listing.listing_type, listing.photo_url, listing.source_url, existing["id"]),
+                """UPDATE listings SET
+                    price=?, listing_type=?, last_seen_at=datetime('now'),
+                    photo_url=?, source_url=?, days_on_mls=?,
+                    bedrooms=COALESCE(?, bedrooms), bathrooms=COALESCE(?, bathrooms),
+                    sqft=COALESCE(?, sqft), lot_sqft=COALESCE(?, lot_sqft),
+                    year_built=COALESCE(?, year_built),
+                    has_garage=COALESCE(?, has_garage), has_basement=COALESCE(?, has_basement),
+                    latitude=COALESCE(?, latitude), longitude=COALESCE(?, longitude)
+                WHERE id=?""",
+                (
+                    listing.price, listing.listing_type, listing.photo_url,
+                    listing.source_url, listing.days_on_mls,
+                    listing.bedrooms, listing.bathrooms, listing.sqft, listing.lot_sqft,
+                    listing.year_built,
+                    int(listing.has_garage) if listing.has_garage is not None else None,
+                    int(listing.has_basement) if listing.has_basement is not None else None,
+                    listing.latitude, listing.longitude,
+                    existing["id"],
+                ),
             )
             conn.commit()
-            return existing["id"], prev_type
+            return existing["id"], prev_type, prev_price
 
         cursor = conn.execute(
             """INSERT INTO listings (
@@ -295,8 +400,8 @@ def upsert_listing(listing: Listing) -> tuple[int, Optional[str]]:
                 listing_type, property_type, bedrooms, bathrooms, sqft, lot_sqft,
                 stories, has_garage, garage_spaces, has_basement, has_fireplace,
                 has_ac, heat_type, has_pool, year_built,
-                hoa_monthly, latitude, longitude, photo_url, source_url
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                hoa_monthly, latitude, longitude, photo_url, source_url, days_on_mls
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 listing.source, listing.source_id, listing.address, listing.city,
                 listing.state, listing.zip_code, listing.price, listing.listing_type,
@@ -310,11 +415,65 @@ def upsert_listing(listing: Listing) -> tuple[int, Optional[str]]:
                 listing.heat_type,
                 int(listing.has_pool) if listing.has_pool is not None else None,
                 listing.year_built, listing.hoa_monthly, listing.latitude,
-                listing.longitude, listing.photo_url, listing.source_url,
+                listing.longitude, listing.photo_url, listing.source_url, listing.days_on_mls,
             ),
         )
         conn.commit()
-        return cursor.lastrowid, None
+        return cursor.lastrowid, None, None
+    finally:
+        conn.close()
+
+
+def record_price_change(listing_id: int, old_price: Optional[float], new_price: Optional[float]) -> None:
+    """Record a price change for a listing."""
+    conn = get_connection()
+    try:
+        conn.execute(
+            "INSERT INTO listing_price_history (listing_id, old_price, new_price) VALUES (?, ?, ?)",
+            (listing_id, old_price, new_price),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_price_changes_for_listings(listing_ids: list[int]) -> dict[int, dict]:
+    """Return the most recent price change for each listing_id. Keys are listing IDs."""
+    if not listing_ids:
+        return {}
+    conn = get_connection()
+    try:
+        placeholders = ",".join("?" * len(listing_ids))
+        rows = conn.execute(
+            f"""
+            SELECT ph.listing_id, ph.old_price, ph.new_price, ph.changed_at
+            FROM listing_price_history ph
+            INNER JOIN (
+                SELECT listing_id, MAX(changed_at) AS max_at
+                FROM listing_price_history
+                WHERE listing_id IN ({placeholders})
+                GROUP BY listing_id
+            ) latest ON ph.listing_id = latest.listing_id AND ph.changed_at = latest.max_at
+            """,
+            listing_ids,
+        ).fetchall()
+        result = {}
+        for row in rows:
+            old_p = row["old_price"]
+            new_p = row["new_price"]
+            delta = None
+            delta_pct = None
+            if old_p and new_p and old_p > 0:
+                delta = new_p - old_p
+                delta_pct = round((delta / old_p) * 100, 1)
+            result[row["listing_id"]] = {
+                "old_price": old_p,
+                "new_price": new_p,
+                "delta": delta,
+                "delta_pct": delta_pct,
+                "changed_at": row["changed_at"],
+            }
+        return result
     finally:
         conn.close()
 
@@ -354,6 +513,59 @@ def mark_listing_starred(listing_id: int) -> None:
     try:
         conn.execute("UPDATE listings SET is_starred = 1 WHERE id = ?", (listing_id,))
         conn.commit()
+    finally:
+        conn.close()
+
+
+def toggle_listing_starred(listing_id: int) -> bool:
+    """Toggle the starred/saved state of a listing. Returns the new state."""
+    conn = get_connection()
+    try:
+        conn.execute("UPDATE listings SET is_starred = 1 - is_starred WHERE id = ?", (listing_id,))
+        conn.commit()
+        row = conn.execute("SELECT is_starred FROM listings WHERE id = ?", (listing_id,)).fetchone()
+        return bool(row["is_starred"]) if row else False
+    finally:
+        conn.close()
+
+
+def get_all_listings() -> list[Listing]:
+    """Return all listings across every search, deduplicated, newest first.
+
+    is_new is 1 if the listing is new in any saved search (not yet seen).
+    """
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            """
+            SELECT l.*, MAX(sr.is_new) AS is_new
+            FROM listings l
+            JOIN search_results sr ON l.id = sr.listing_id
+            GROUP BY l.id
+            ORDER BY l.last_seen_at DESC
+            """
+        ).fetchall()
+        return [_row_to_listing(row) for row in rows]
+    finally:
+        conn.close()
+
+
+def get_starred_listings(session_id: str = "default") -> list[Listing]:
+    """Return user-saved listings for a session, most recently seen first."""
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            """
+            SELECT l.*, MAX(sr.is_new) AS is_new FROM listings l
+            JOIN search_results sr ON l.id = sr.listing_id
+            JOIN saved_searches ss ON sr.search_id = ss.id
+            WHERE l.is_starred = 1 AND ss.session_id = ?
+            GROUP BY l.id
+            ORDER BY l.last_seen_at DESC
+            """,
+            (session_id,),
+        ).fetchall()
+        return [_row_to_listing(row) for row in rows]
     finally:
         conn.close()
 
@@ -399,11 +611,48 @@ def get_previous_listing_ids(search_id: int) -> set[int]:
         conn.close()
 
 
+def get_seen_listing_ids(search_id: int) -> set[int]:
+    """Return only listing IDs that have already been alerted (is_new=0).
+
+    Used by the scheduler to detect listings found by manual runs that
+    were never alerted — those have is_new=1 and won't appear here.
+    """
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            "SELECT listing_id FROM search_results WHERE search_id = ? AND is_new = 0",
+            (search_id,),
+        ).fetchall()
+        return {row["listing_id"] for row in rows}
+    finally:
+        conn.close()
+
+
 def mark_results_not_new(search_id: int):
     conn = get_connection()
     try:
         conn.execute(
             "UPDATE search_results SET is_new = 0 WHERE search_id = ?", (search_id,)
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def mark_listings_alerted(listing_ids: list[int]) -> None:
+    """Mark specific listings as seen (is_new=0) across ALL searches.
+
+    Prevents duplicate alerts when the same listing appears in multiple
+    saved searches — once alerted for any search, it won't fire again.
+    """
+    if not listing_ids:
+        return
+    conn = get_connection()
+    try:
+        placeholders = ",".join("?" * len(listing_ids))
+        conn.execute(
+            f"UPDATE search_results SET is_new = 0 WHERE listing_id IN ({placeholders})",
+            listing_ids,
         )
         conn.commit()
     finally:
@@ -440,7 +689,184 @@ def _row_to_listing(row) -> Listing:
         longitude=row["longitude"],
         photo_url=row["photo_url"],
         source_url=row["source_url"],
+        days_on_mls=row["days_on_mls"] if "days_on_mls" in row.keys() else None,
         first_seen_at=datetime.fromisoformat(row["first_seen_at"]) if row["first_seen_at"] else None,
         last_seen_at=datetime.fromisoformat(row["last_seen_at"]) if row["last_seen_at"] else None,
         is_starred=bool(row["is_starred"]) if "is_starred" in row.keys() and row["is_starred"] else False,
+        is_new=bool(row["is_new"]) if "is_new" in row.keys() and row["is_new"] else False,
     )
+
+
+# --- Alert Queue ---
+
+def queue_alert(search_id: Optional[int], search_name: str, webhook_url: str, payload: dict) -> int:
+    """Save a failed webhook alert for later retry."""
+    import json
+    conn = get_connection()
+    try:
+        cursor = conn.execute(
+            "INSERT INTO pending_alerts (search_id, search_name, webhook_url, payload_json) VALUES (?, ?, ?, ?)",
+            (search_id, search_name, webhook_url, json.dumps(payload)),
+        )
+        conn.commit()
+        return cursor.lastrowid
+    finally:
+        conn.close()
+
+
+def get_pending_alerts() -> list[dict]:
+    """Return all unsent alerts, oldest first."""
+    import json
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            "SELECT id, search_id, search_name, webhook_url, payload_json, attempts FROM pending_alerts ORDER BY created_at ASC"
+        ).fetchall()
+        return [
+            {
+                "id": r["id"],
+                "search_id": r["search_id"],
+                "search_name": r["search_name"],
+                "webhook_url": r["webhook_url"],
+                "payload": json.loads(r["payload_json"]),
+                "attempts": r["attempts"],
+            }
+            for r in rows
+        ]
+    finally:
+        conn.close()
+
+
+def mark_alert_sent(alert_id: int) -> None:
+    """Remove a successfully delivered alert from the queue."""
+    conn = get_connection()
+    try:
+        conn.execute("DELETE FROM pending_alerts WHERE id = ?", (alert_id,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def increment_alert_attempts(alert_id: int) -> None:
+    """Bump the attempt counter on a failed retry."""
+    conn = get_connection()
+    try:
+        conn.execute("UPDATE pending_alerts SET attempts = attempts + 1 WHERE id = ?", (alert_id,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_new_listing_counts_per_search() -> dict[int, int]:
+    """Return {search_id: new_listing_count} for all searches that have unseen listings."""
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            "SELECT search_id, COUNT(*) AS cnt FROM search_results WHERE is_new = 1 GROUP BY search_id"
+        ).fetchall()
+        return {row["search_id"]: row["cnt"] for row in rows}
+    finally:
+        conn.close()
+
+
+# --- Push subscriptions ---
+
+def save_push_subscription(sub_id: str, endpoint: str, p256dh: str, auth: str) -> None:
+    conn = get_connection()
+    try:
+        conn.execute(
+            "INSERT OR REPLACE INTO push_subscriptions (id, endpoint, p256dh, auth) VALUES (?, ?, ?, ?)",
+            (sub_id, endpoint, p256dh, auth),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def delete_push_subscription(sub_id: str) -> None:
+    conn = get_connection()
+    try:
+        conn.execute("DELETE FROM push_subscriptions WHERE id = ?", (sub_id,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_all_push_subscriptions() -> list[dict]:
+    conn = get_connection()
+    try:
+        rows = conn.execute("SELECT id, endpoint, p256dh, auth FROM push_subscriptions").fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+# --- Sessions ---
+
+def create_session(session_id: str) -> bool:
+    """Insert session. Returns True if it was newly created, False if it already existed."""
+    conn = get_connection()
+    try:
+        cursor = conn.execute("INSERT OR IGNORE INTO sessions (id) VALUES (?)", (session_id,))
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+
+def migrate_default_to_session(session_id: str) -> None:
+    """One-time migration: move all 'default' searches and dismissals to a real session.
+    Called when a brand-new session is first created so existing data is not lost."""
+    conn = get_connection()
+    try:
+        conn.execute(
+            "UPDATE saved_searches SET session_id = ? WHERE session_id = 'default'",
+            (session_id,),
+        )
+        conn.execute(
+            """INSERT OR IGNORE INTO dismissed_listings (source_id, session_id, dismissed_at)
+               SELECT source_id, ?, dismissed_at FROM dismissed_listings WHERE session_id = 'default'""",
+            (session_id,),
+        )
+        conn.execute("DELETE FROM dismissed_listings WHERE session_id = 'default'")
+        conn.commit()
+    finally:
+        conn.close()
+
+
+# --- Dismissed listings ---
+
+def dismiss_listing(source_id: str, session_id: str = "default") -> None:
+    conn = get_connection()
+    try:
+        conn.execute(
+            "INSERT OR IGNORE INTO dismissed_listings (source_id, session_id) VALUES (?, ?)",
+            (source_id, session_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def undismiss_listing(source_id: str, session_id: str = "default") -> None:
+    conn = get_connection()
+    try:
+        conn.execute(
+            "DELETE FROM dismissed_listings WHERE source_id = ? AND session_id = ?",
+            (source_id, session_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_dismissed_source_ids(session_id: str = "default") -> set[str]:
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            "SELECT source_id FROM dismissed_listings WHERE session_id = ?",
+            (session_id,),
+        ).fetchall()
+        return {row["source_id"] for row in rows}
+    finally:
+        conn.close()

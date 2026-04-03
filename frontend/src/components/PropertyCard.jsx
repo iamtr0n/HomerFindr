@@ -1,58 +1,86 @@
-import { useState, useEffect, useCallback } from 'react'
-import { ExternalLink, Bed, Bath, Ruler, Calendar, Home } from 'lucide-react'
-import { Card, CardContent } from './ui/Card'
-import { Badge } from './ui/Badge'
-import { Button } from './ui/Button'
+import { useState, useCallback } from 'react'
+import { ExternalLink, Bed, Bath, Ruler, Calendar, Home, Bookmark, X } from 'lucide-react'
 
 const LISTING_TYPE_STYLES = {
-  sale: { label: 'For Sale', cls: 'bg-green-100 text-green-800 border-green-300' },
-  pending: { label: 'Pending', cls: 'bg-amber-100 text-amber-800 border-amber-300' },
-  coming_soon: { label: 'Coming Soon', cls: 'bg-blue-100 text-blue-800 border-blue-300' },
-  rent: { label: 'For Rent', cls: 'bg-purple-100 text-purple-800 border-purple-300' },
-  sold: { label: 'Sold', cls: 'bg-gray-100 text-gray-600 border-gray-300' },
+  sale:        { label: 'For Sale',    cls: 'bg-match-strong/70 text-white border border-match-strong' },
+  pending:     { label: 'Pending',     cls: 'bg-amber-500/20 text-amber-400 border border-amber-500/40' },
+  coming_soon: { label: 'Coming Soon', cls: 'bg-match-good/20 text-match-good border border-match-good/40' },
+  rent:        { label: 'For Rent',    cls: 'bg-purple-400/20 text-purple-400 border border-purple-400/40' },
+  sold:        { label: 'Sold',        cls: 'bg-canvas-600 text-ink-muted border border-canvas-500' },
 }
 
 function DomBadge({ days }) {
   if (days == null) return null
-  if (days < 7) return (
-    <span className="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-700 border border-green-300 font-medium">New</span>
+  const label = days === 0 ? 'Listed today' : days === 1 ? '1 day on market' : `${days} days on market`
+  if (days <= 14) return (
+    <p className="text-xs font-medium">
+      <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/30">{label}</span>
+    </p>
   )
-  if (days >= 31 && days <= 60) return (
-    <span className="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-700 border border-amber-300">{days} days</span>
+  if (days <= 45) return (
+    <p className="text-xs font-medium">
+      <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30">{label}</span>
+    </p>
   )
-  if (days > 60) return (
-    <span className="px-2 py-0.5 text-xs rounded-full bg-red-100 text-red-700 border border-red-300">{days} days</span>
+  return (
+    <p className="text-xs font-medium">
+      <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/30">{label}</span>
+    </p>
   )
-  return null
+}
+
+function MatchDots({ score, maxScore }) {
+  const filled = maxScore > 0 ? Math.round((score / maxScore) * 5) : 0
+  return (
+    <div className="flex items-center gap-0.5">
+      {[...Array(5)].map((_, i) => (
+        <span
+          key={i}
+          className={`w-1.5 h-1.5 rounded-full ${i < filled ? 'bg-amber-400' : 'bg-canvas-600'}`}
+        />
+      ))}
+    </div>
+  )
 }
 
 const VIEWED_KEY = 'homerfindr_viewed'
-
 function readViewed() {
-  try {
-    return new Set(JSON.parse(localStorage.getItem(VIEWED_KEY) || '[]'))
-  } catch {
-    return new Set()
-  }
+  try { return new Set(JSON.parse(localStorage.getItem(VIEWED_KEY) || '[]')) } catch { return new Set() }
 }
-
 function writeViewed(set) {
-  try {
-    localStorage.setItem(VIEWED_KEY, JSON.stringify([...set]))
-  } catch {}
+  try { localStorage.setItem(VIEWED_KEY, JSON.stringify([...set])) } catch {}
 }
 
-export default function PropertyCard({ listing, isGoldStar = false, isViewed = false }) {
+const DISMISSED_KEY = 'homerfindr_dismissed'
+function readDismissed() {
+  try { return new Set(JSON.parse(localStorage.getItem(DISMISSED_KEY) || '[]')) } catch { return new Set() }
+}
+function writeDismissed(set) {
+  try { localStorage.setItem(DISMISSED_KEY, JSON.stringify([...set])) } catch {}
+}
+
+export default function PropertyCard({ listing, isGoldStar = false, isViewed = false, maxScore = 5, onToggleStar, mortgageSettings, onDismiss, commuteMinutes }) {
   const {
-    address, city, state, price, bedrooms, bathrooms, sqft, year_built,
+    id: listingId, address, city, state, price, bedrooms, bathrooms, sqft, year_built,
     has_garage, has_basement, stories, hoa_monthly, photo_url, source_url,
     source, zip_code, property_type, match_badges, near_highway, highway_name,
-    school_rating, school_district, listing_type, match_score, days_on_mls,
-    source_id,
+    school_rating, listing_type, match_score, days_on_mls, source_id, is_starred,
+    price_change, is_new,
   } = listing
 
   const [imgLoaded, setImgLoaded] = useState(false)
   const [viewed, setViewed] = useState(() => source_id ? readViewed().has(source_id) : false)
+  const [starred, setStarred] = useState(is_starred || false)
+  // Optimistic local hide — parent handles actual persistence via API
+  const [hidden, setHidden] = useState(false)
+
+  const handleDismiss = useCallback((e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!source_id) return
+    setHidden(true)
+    onDismiss?.(source_id)
+  }, [source_id, onDismiss])
 
   const markViewed = useCallback(() => {
     if (!source_id || viewed) return
@@ -61,31 +89,67 @@ export default function PropertyCard({ listing, isGoldStar = false, isViewed = f
     writeViewed(set)
     setViewed(true)
   }, [source_id, viewed])
-  const placeholderClass = `w-full h-52 bg-slate-100 flex flex-col items-center justify-center text-slate-400 gap-2${photo_url && !imgLoaded ? ' animate-pulse' : ''}`
 
+  if (hidden) return null
+
+  // Mortgage monthly payment
+  let monthlyPayment = null
+  if (mortgageSettings && price) {
+    const { rate, downPct, termYears } = mortgageSettings
+    const principal = price * (1 - downPct / 100)
+    const r = rate / 100 / 12
+    const n = termYears * 12
+    if (r > 0 && n > 0 && principal > 0) {
+      monthlyPayment = Math.round(principal * (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1))
+    }
+  }
+
+  // Price change badge
+  let priceChangeBadge = null
+  if (price_change && price_change.delta != null) {
+    const isDown = price_change.delta < 0
+    const absDelta = Math.abs(price_change.delta)
+    const deltaStr = absDelta >= 1000 ? `$${Math.round(absDelta / 1000)}k` : `$${Math.round(absDelta)}`
+    const daysAgo = price_change.changed_at
+      ? Math.max(0, Math.floor((Date.now() - new Date(price_change.changed_at).getTime()) / 86400000))
+      : null
+    const timeStr = daysAgo === 0 ? 'today' : daysAgo === 1 ? '1 day ago' : daysAgo != null ? `${daysAgo}d ago` : ''
+    priceChangeBadge = { isDown, deltaStr, timeStr }
+  }
+
+  const isViewedState = isViewed || viewed
   const priceStr = price ? `$${price.toLocaleString()}` : 'Price N/A'
+  const priceSqft = price && sqft && sqft > 0 ? Math.round(price / sqft) : null
+  const locationStr = [city, state].filter(Boolean).join(', ')
+  const fullLocation = [locationStr, zip_code].filter(Boolean).join(' ')
 
   const features = []
   if (has_garage) features.push('Garage')
   if (has_basement) features.push('Basement')
   if (stories) features.push(`${stories} Floor${stories > 1 ? 's' : ''}`)
   if (hoa_monthly) features.push(`HOA $${hoa_monthly}/mo`)
-  if (school_rating) features.push(`School: ${school_rating}/10`)
-
-  const locationStr = [city, state].filter(Boolean).join(', ')
-  const fullLocation = [locationStr, zip_code].filter(Boolean).join(' ')
-
-  const isViewedState = isViewed || viewed
+  if (school_rating) features.push(`Schools ${school_rating}/10`)
 
   return (
-    <Card className={`overflow-hidden hover:shadow-md transition-shadow ${isGoldStar ? 'ring-2 ring-amber-400 border-amber-300' : ''} ${isViewedState ? 'opacity-50' : ''}`}>
+    <div className={`
+      rounded-xl border bg-canvas-900 overflow-hidden transition-all duration-200
+      hover:shadow-card-hover hover:border-canvas-500
+      ${isGoldStar ? 'border-amber-500/50 shadow-glow-amber' : 'border-canvas-700 shadow-card'}
+      ${isViewedState ? 'opacity-60 grayscale-[20%]' : ''}
+    `}>
       {/* Photo */}
-      <a href={source_url || '#'} target="_blank" rel="noopener noreferrer" className="relative block" onClick={markViewed}>
+      <a
+        href={source_url || '#'}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="relative block group"
+        onClick={markViewed}
+      >
         {photo_url ? (
           <img
             src={photo_url}
             alt={address}
-            className="w-full h-52 object-cover bg-slate-100"
+            className="w-full h-48 object-cover bg-canvas-800"
             referrerPolicy="no-referrer"
             onLoad={() => setImgLoaded(true)}
             onError={(e) => {
@@ -96,75 +160,115 @@ export default function PropertyCard({ listing, isGoldStar = false, isViewed = f
           />
         ) : null}
         <div
-          className={placeholderClass}
+          className={`w-full h-48 bg-canvas-800 flex flex-col items-center justify-center text-canvas-500 gap-2${photo_url && !imgLoaded ? ' animate-pulse' : ''}`}
           style={photo_url && imgLoaded ? { display: 'none' } : undefined}
         >
           <Home size={28} />
-          <span className="text-xs">No Photo Available</span>
+          <span className="text-xs text-canvas-600">No Photo</span>
         </div>
-        {/* Listing type badge — bottom-left of image */}
+
+        {/* Dismiss button — large touch target, always visible on mobile */}
+        {source_id && (
+          <button
+            onClick={handleDismiss}
+            title="Hide this listing"
+            className="absolute top-1.5 left-1.5 z-10 w-10 h-10 flex items-center justify-center bg-canvas-900/70 backdrop-blur-sm rounded-full border border-canvas-500/60 text-ink-secondary hover:bg-red-500 hover:border-red-500 hover:text-white sm:opacity-50 sm:hover:opacity-100 opacity-90 transition-all duration-150 active:scale-95"
+          >
+            <X size={17} />
+          </button>
+        )}
+
+        {/* New listing badge — left-14 to clear the 40px dismiss button */}
+        {is_new && !isGoldStar && (
+          <span className="absolute top-2 left-14 bg-match-strong text-white font-semibold text-xs rounded-full px-3 py-1 shadow-sm">
+            New
+          </span>
+        )}
+
+        {/* Gold star badge */}
+        {isGoldStar && (
+          <span className="absolute top-2 left-14 bg-amber-500 text-canvas-950 font-semibold text-xs rounded-full px-3 py-1">
+            {is_new ? '⭐ New · Perfect Match' : '⭐ Perfect Match'}
+          </span>
+        )}
+
+        {/* Source badge */}
+        <span className="absolute top-2 right-2 bg-canvas-900/80 backdrop-blur-sm text-ink-muted text-xs rounded-full px-2.5 py-0.5 capitalize border border-canvas-700">
+          {source}
+        </span>
+
+        {/* Listing type badge */}
         {listing_type && LISTING_TYPE_STYLES[listing_type] && (
-          <span className={`absolute bottom-2 left-2 px-2 py-0.5 text-xs rounded-full border font-medium shadow-sm ${LISTING_TYPE_STYLES[listing_type].cls}`}>
+          <span className={`absolute bottom-2 left-2 px-2.5 py-0.5 text-xs rounded-full font-medium ${LISTING_TYPE_STYLES[listing_type].cls}`}>
             {LISTING_TYPE_STYLES[listing_type].label}
           </span>
         )}
+
+        {/* Viewed badge */}
         {isViewedState && (
-          <span className="absolute bottom-2 right-2 px-2 py-0.5 text-xs rounded-full bg-slate-700/80 text-slate-200 font-medium">
+          <span className="absolute bottom-2 right-2 bg-canvas-800/90 text-ink-muted text-xs rounded-full px-2 py-0.5 border border-canvas-600">
             Viewed
           </span>
         )}
-        {isGoldStar && (
-          <Badge className="absolute top-2 left-2 bg-amber-400 text-amber-900 shadow-sm">
-            &#11088; Perfect Match
-          </Badge>
-        )}
-        <Badge variant="secondary" className="absolute top-2 right-2 capitalize shadow-sm">
-          {source}
-        </Badge>
       </a>
 
-      <CardContent className="p-4">
-        {/* Price + score chip */}
-        <div className="flex items-baseline gap-2 mb-1">
-          <p className="text-2xl font-bold text-slate-900">{priceStr}</p>
+      {/* Content */}
+      <div className="p-4">
+        {/* Days on market — right below the photo */}
+        {days_on_mls != null && <div className="mb-2"><DomBadge days={days_on_mls} /></div>}
+
+        {/* Price row */}
+        <div className="flex items-center gap-2 mb-1 flex-wrap">
+          <p className="font-serif text-2xl text-ink-primary">{priceStr}</p>
           {match_score != null && match_score > 0 && (
-            <span className="px-2 py-0.5 text-xs rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-medium">
-              {match_score} match
+            <MatchDots score={match_score} maxScore={maxScore} />
+          )}
+          {priceChangeBadge && (
+            <span className={`px-2 py-0.5 text-xs rounded-full font-medium border ${
+              priceChangeBadge.isDown
+                ? 'bg-match-strong/10 text-match-strong border-match-strong/30'
+                : 'bg-red-400/10 text-red-400 border-red-400/30'
+            }`}>
+              {priceChangeBadge.isDown ? '↓' : '↑'} {priceChangeBadge.deltaStr}
+              {priceChangeBadge.timeStr && <span className="opacity-70"> · {priceChangeBadge.timeStr}</span>}
             </span>
           )}
-          <DomBadge days={days_on_mls} />
         </div>
+        {monthlyPayment && (
+          <p className={`text-xs mb-1 ${
+            !mortgageSettings?.budgetMax ? 'text-ink-muted'
+            : monthlyPayment <= mortgageSettings.budgetMax ? 'text-match-strong'
+            : monthlyPayment <= mortgageSettings.budgetMax * 1.2 ? 'text-match-warn'
+            : 'text-red-400'
+          }`}>~${monthlyPayment.toLocaleString()}/mo</p>
+        )}
+        {commuteMinutes != null && (
+          <p className="text-xs text-ink-muted mb-1">
+            ~{commuteMinutes} min to work
+            <span className={`ml-1 font-medium ${commuteMinutes <= 20 ? 'text-match-strong' : commuteMinutes <= 40 ? 'text-match-warn' : 'text-red-400'}`}>
+              ●
+            </span>
+          </p>
+        )}
 
         {/* Stats row */}
-        <div className="flex items-center gap-3 text-sm text-slate-600 mb-2 flex-wrap">
-          {bedrooms != null && (
-            <span className="flex items-center gap-1"><Bed size={14} /> {bedrooms} bd</span>
-          )}
-          {bathrooms != null && (
-            <span className="flex items-center gap-1"><Bath size={14} /> {bathrooms} ba</span>
-          )}
-          {sqft != null && (
-            <span className="flex items-center gap-1"><Ruler size={14} /> {sqft.toLocaleString()} sqft</span>
-          )}
-          {price != null && sqft != null && sqft > 0 && (
-            <span className="text-slate-400">${Math.round(price / sqft).toLocaleString()}/sqft</span>
-          )}
-          {year_built != null && (
-            <span className="flex items-center gap-1"><Calendar size={14} /> {year_built}</span>
-          )}
+        <div className="flex items-center gap-3 text-sm text-ink-secondary mb-2 flex-wrap">
+          {bedrooms != null && <span className="flex items-center gap-1"><Bed size={13} /> {bedrooms} bd</span>}
+          {bathrooms != null && <span className="flex items-center gap-1"><Bath size={13} /> {bathrooms} ba</span>}
+          {sqft != null && <span className="flex items-center gap-1"><Ruler size={13} /> {sqft.toLocaleString()}</span>}
+          {priceSqft && <span className="text-ink-muted font-mono text-xs">${priceSqft.toLocaleString()}/sqft</span>}
+          {year_built != null && <span className="flex items-center gap-1 text-ink-muted"><Calendar size={13} /> {year_built}</span>}
         </div>
 
         {/* Address */}
-        <p className="text-sm text-slate-500 line-clamp-1 mb-2">{address}</p>
-        {fullLocation && (
-          <p className="text-xs text-slate-400 mb-3">{fullLocation}</p>
-        )}
+        <p className="text-sm text-ink-secondary line-clamp-1 mb-0.5">{address}</p>
+        {fullLocation && <p className="text-xs text-ink-muted mb-3">{fullLocation}</p>}
 
         {/* Match badges */}
         {match_badges && match_badges.length > 0 && (
           <div className="flex flex-wrap gap-1 mb-3">
-            {match_badges.map((badge) => (
-              <span key={badge} className="px-2 py-0.5 text-xs rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+            {match_badges.map(badge => (
+              <span key={badge} className="px-2 py-0.5 text-xs rounded-full bg-match-good/10 text-match-good border border-match-good/20">
                 {badge}
               </span>
             ))}
@@ -173,34 +277,51 @@ export default function PropertyCard({ listing, isGoldStar = false, isViewed = f
 
         {/* Highway warning */}
         {near_highway && (
-          <div className="flex items-center gap-1 text-amber-600 text-xs font-medium mb-2">
-            <span>&#9888;&#65039;</span> Near {highway_name || 'Highway'}
+          <div className="flex items-center gap-1.5 text-match-warn text-xs font-medium mb-2">
+            <span>⚠</span> Near {highway_name || 'Highway'}
           </div>
         )}
 
-        {/* Features */}
+        {/* Feature pills */}
         {features.length > 0 && (
           <div className="flex flex-wrap gap-1 mb-3">
-            {features.map((f) => (
-              <Badge key={f} variant="outline" className="text-xs">{f}</Badge>
+            {features.map(f => (
+              <span key={f} className="px-2.5 py-0.5 text-xs rounded-full border border-canvas-600 text-ink-muted bg-canvas-800">
+                {f}
+              </span>
             ))}
           </div>
         )}
 
         {/* Property type */}
-        <div className="flex justify-between items-center text-xs text-slate-400 mb-3">
-          <span className="capitalize">{(property_type || '').replace('_', ' ')}</span>
-        </div>
+        <p className="text-xs text-canvas-500 capitalize mb-3">{(property_type || '').replace('_', ' ')}</p>
 
-        {/* View link */}
-        {source_url && (
-          <a href={source_url} target="_blank" rel="noopener noreferrer" className="block" onClick={markViewed}>
-            <Button variant="default" className="w-full">
-              <ExternalLink size={14} /> View on {source}
-            </Button>
-          </a>
-        )}
-      </CardContent>
-    </Card>
+        {/* View + Save row */}
+        <div className="flex gap-2">
+          {source_url ? (
+            <a href={source_url} target="_blank" rel="noopener noreferrer" onClick={markViewed} className="flex-1">
+              <button className="w-full flex items-center justify-center gap-2 bg-canvas-800 border border-canvas-600 hover:border-amber-500 hover:text-amber-400 text-ink-secondary text-sm rounded-lg py-2 transition-all duration-150">
+                <ExternalLink size={14} /> View on {source}
+              </button>
+            </a>
+          ) : (
+            <div className="flex-1 h-9" />
+          )}
+          {onToggleStar && listingId && (
+            <button
+              onClick={() => { setStarred(s => !s); onToggleStar(listingId) }}
+              title={starred ? 'Unsave' : 'Save listing'}
+              className={`px-3 rounded-lg border transition-all duration-150 ${
+                starred
+                  ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
+                  : 'bg-canvas-800 border-canvas-600 text-ink-muted hover:border-amber-500 hover:text-amber-400'
+              }`}
+            >
+              <Bookmark size={14} className={starred ? 'fill-current' : ''} />
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
   )
 }

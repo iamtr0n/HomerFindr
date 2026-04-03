@@ -1,11 +1,10 @@
 class Homerfindr < Formula
   desc "Universal home search aggregator — find homes across all platforms in one place"
   homepage "https://github.com/iamtr0n/HomerFindr"
-  url "https://github.com/iamtr0n/HomerFindr/archive/refs/heads/main.tar.gz"
-  version "1.1.0"
-  # Update sha256 after pinning a release tag:
-  #   curl -sL https://github.com/iamtr0n/HomerFindr/archive/refs/heads/main.tar.gz | shasum -a 256
-  sha256 :no_check
+  url "https://github.com/iamtr0n/HomerFindr/archive/refs/tags/v1.2.0.tar.gz"
+  version "1.2.0"
+  # sha256 is updated automatically by GitHub Actions on each `make release V=x.y.z`
+  sha256 "UPDATED_BY_CI"
 
   depends_on "node"
   depends_on "python@3.11"

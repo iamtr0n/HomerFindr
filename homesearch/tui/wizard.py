@@ -250,6 +250,9 @@ def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
 
     _BACK = "__BACK__"
 
+    # Tracks navigation direction so auto-skip steps know when to propagate back
+    _nav = {"going_back": False}
+
     # ------------------------------------------------------------------
     # Navigation helpers
     # ------------------------------------------------------------------
@@ -333,7 +336,8 @@ def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
     def _step_days_pending(s):
         lts = s.get("listing_types", [])
         if ListingType.PENDING not in lts:
-            return {"days_pending_min": None}
+            # Auto-skip: propagate back when user is navigating backward
+            return _BACK if _nav["going_back"] else {"days_pending_min": None}
         r = _s(
             "Minimum days pending:",
             ["Any", "7+ days", "14+ days", "30+ days", "45+ days", "60+ days"],
@@ -563,10 +567,12 @@ def _run_wizard_once() -> tuple[SearchCriteria, str] | None:
         if result is None:
             return None  # ESC / hard cancel
         if result == _BACK:
+            _nav["going_back"] = True
             if step_idx == 0:
                 return None  # back on first step = cancel
             step_idx -= 1
         else:
+            _nav["going_back"] = False
             state.update(result)
             step_idx += 1
 

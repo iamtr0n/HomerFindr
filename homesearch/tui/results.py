@@ -128,11 +128,88 @@ def execute_search_with_spinner(criteria: SearchCriteria) -> tuple[list[Listing]
     return results, pre_filter_count, raw_listings_out
 
 
+def _filter_by_area(listings: list) -> list:
+    """Interactive ZIP/area filter. Returns filtered listing list.
+
+    Shows a numbered list of cities/ZIPs found, lets user pick which to keep.
+    Pressing Enter with no input returns all listings (no filter).
+    """
+    from collections import Counter
+    from rich.table import Table
+    from rich.prompt import Prompt
+
+    if not listings:
+        return listings
+
+    # Build city+zip summary sorted by count descending
+    area_counts: Counter = Counter()
+    area_labels: dict[str, str] = {}  # "city|zip" -> display label
+    for l in listings:
+        city = (l.city or "").strip()
+        zip_code = (l.zip_code or "").strip()
+        key = f"{city}|{zip_code}"
+        area_counts[key] += 1
+        if key not in area_labels:
+            if city and zip_code:
+                area_labels[key] = f"{city} ({zip_code})"
+            elif city:
+                area_labels[key] = city
+            else:
+                area_labels[key] = zip_code or "Unknown"
+
+    # Only offer filter when multiple areas exist
+    unique_areas = sorted(area_counts.keys(), key=lambda k: -area_counts[k])
+    if len(unique_areas) <= 1:
+        return listings
+
+    # Display area table
+    console.print("\n[bold]Areas found:[/bold]")
+    table = Table(show_header=False, box=None, padding=(0, 2))
+    table.add_column("", style="dim", width=4)
+    table.add_column("", style="cyan")
+    table.add_column("", style="dim")
+    for i, key in enumerate(unique_areas, 1):
+        count = area_counts[key]
+        label = area_labels[key]
+        table.add_row(f"{i}.", label, f"{count} listing{'s' if count != 1 else ''}")
+    console.print(table)
+
+    console.print("[dim]Enter numbers to keep (e.g. 1,3,5) or press Enter for all[/dim]")
+    raw = Prompt.ask("[dim]Filter areas[/dim]", default="")
+
+    if not raw.strip():
+        return listings
+
+    # Parse selection
+    selected_keys: set[str] = set()
+    for part in raw.replace(" ", "").split(","):
+        try:
+            idx = int(part) - 1
+            if 0 <= idx < len(unique_areas):
+                selected_keys.add(unique_areas[idx])
+        except ValueError:
+            pass
+
+    if not selected_keys:
+        return listings
+
+    return [
+        l for l in listings
+        if f"{(l.city or '').strip()}|{(l.zip_code or '').strip()}" in selected_keys
+    ]
+
+
 def display_results(results: list[Listing], criteria: SearchCriteria, pre_filter_count: int = 0, raw_listings: list[Listing] | None = None) -> bool:
     """Interactive results browser. Returns True if user wants a new search."""
     if not results:
         _show_no_results(criteria, pre_filter_count, raw_listings)
         return _ask_new_search()
+
+    # Offer area filter when multiple cities/ZIPs are present
+    listings = _filter_by_area(results)
+    if not listings:
+        console.print("[yellow]All areas deselected — showing all results.[/yellow]")
+        listings = results
 
     providers = set(r.source for r in results)
     max_score = max((l.match_score for l in results), default=0)
@@ -148,7 +225,7 @@ def display_results(results: list[Listing], criteria: SearchCriteria, pre_filter
     # Load viewed IDs for full result set and push viewed listings to bottom
     all_source_ids = [l.source_id for l in results if l.source_id]
     viewed_ids = db.get_viewed_source_ids(all_source_ids)
-    results.sort(key=lambda l: 1 if l.source_id in viewed_ids else 0)
+    listings.sort(key=lambda l: 1 if l.source_id in viewed_ids else 0)
 
     # Build selector choices — show key info on each line
     page_size = 50
@@ -156,7 +233,7 @@ def display_results(results: list[Listing], criteria: SearchCriteria, pre_filter
     hide_viewed = False
 
     while True:
-        active = [l for l in results if l.source_id not in viewed_ids] if hide_viewed else results
+        active = [l for l in listings if l.source_id not in viewed_ids] if hide_viewed else listings
         page = active[offset:offset + page_size]
 
         choices = []

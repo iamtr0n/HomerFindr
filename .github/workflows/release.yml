@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    env:
+      TAG_NAME: ${{ github.ref_name }}
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION="${TAG_NAME#v}"
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Update Homebrew formula sha256
+        run: |
+          TARBALL_URL="https://github.com/${REPO}/archive/refs/tags/${TAG_NAME}.tar.gz"
+          SHA=$(curl -sL "$TARBALL_URL" | sha256sum | awk '{print $1}')
+          VERSION="${TAG_NAME#v}"
+          sed -i \
+            -e "s|url \".*\"|url \"$TARBALL_URL\"|" \
+            -e "s|version \".*\"|version \"$VERSION\"|" \
+            -e "s|sha256 .*|sha256 \"$SHA\"|" \
+            homebrew-formula/homerfindr.rb
+          echo "Updated formula: version=$VERSION sha256=$SHA"
+
+      - name: Create release notes
+        run: |
+          VERSION="${TAG_NAME#v}"
+          cat > release_notes.md << NOTES
+          ## Install
+
+          **macOS** — paste in Terminal:
+          \`\`\`bash
+          curl -fsSL https://github.com/${REPO}/releases/download/${TAG_NAME}/install.sh | bash
+          \`\`\`
+
+          **Windows** — paste in PowerShell:
+          \`\`\`powershell
+          irm https://github.com/${REPO}/releases/download/${TAG_NAME}/install.ps1 | iex
+          \`\`\`
+
+          ## Update an existing install
+
+          Re-run the same installer — it detects an existing install and updates automatically.
+
+          Or from the project directory:
+          \`\`\`bash
+          make update
+          \`\`\`
+          NOTES
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "HomerFindr v${{ steps.version.outputs.VERSION }}"
+          body_path: release_notes.md
+          files: |
+            install.sh
+            install.ps1
+            homebrew-formula/homerfindr.rb
+          draft: false
+          prerelease: false

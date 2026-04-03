@@ -71,6 +71,7 @@ class SearchCriteria(BaseModel):
     school_rating_min: Optional[int] = None  # 1-10
 
     house_styles: list[str] = Field(default_factory=list)  # e.g. ["cape_cod", "ranch"]
+    style_strict: bool = False  # if True, hide listings where style cannot be detected
     days_pending_min: Optional[int] = None  # Only show pending listings with >= this many days on market
 
 
@@ -114,6 +115,7 @@ class Listing(BaseModel):
     match_badges: list[str] = Field(default_factory=list)
     is_gold_star: bool = False
     is_starred: bool = False  # Starred by a notification alert (tracked across searches)
+    is_new: bool = False  # True until the user views the search results
     first_seen_at: Optional[datetime] = None
     last_seen_at: Optional[datetime] = None
     days_on_mls: Optional[int] = None
@@ -128,6 +130,8 @@ class NotificationSettings(BaseModel):
     desktop: bool = True                    # macOS osascript notification
     zapier_webhook: str = ""                # Zapier webhook URL (empty = disabled)
     notify_coming_soon_only: bool = False   # Only alert on coming_soon listing_type
+    alerts_paused: bool = False             # Pause all alerts without deleting settings
+    recipients: list[str] = Field(default_factory=list)  # Phone numbers to include in webhook payload
 
 
 class SavedSearch(BaseModel):

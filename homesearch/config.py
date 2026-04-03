@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     report_minute: int = 0
 
     # Web server
-    host: str = "127.0.0.1"
+    host: str = "0.0.0.0"
     port: int = 8000
 
     # Optional paid API keys
@@ -29,7 +29,31 @@ class Settings(BaseSettings):
     # Global Zapier webhook — fires for all saved searches that don't override it
     zapier_webhook_url: str = ""
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    # Background polling for all saved searches
+    background_polling_enabled: bool = True
+    background_poll_interval_minutes: int = 15
+
+    # Web Push (VAPID)
+    vapid_public_key: str = ""
+    vapid_private_key_path: str = ""
+
+    # User timezone (e.g. "America/New_York") — used for report scheduling and display
+    user_timezone: str = ""
+
+    # Work address for commute estimation
+    work_address: str = ""
+    work_lat: float | None = None
+    work_lng: float | None = None
+
+    # Shared household session — all devices connecting to this server use the same session
+    # so dismissals, saved searches, and stars sync automatically across phone/desktop/tablet.
+    household_session: str = ""
+
+    model_config = {
+        # Read from both the home dir config and any local .env (local wins)
+        "env_file": [str(Path.home() / ".homesearch" / ".env"), ".env"],
+        "env_file_encoding": "utf-8",
+    }
 
 
 settings = Settings()

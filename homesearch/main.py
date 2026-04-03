@@ -214,12 +214,14 @@ def serve():
     url = f"http://{settings.host}:{settings.port}"
     console.print(Panel.fit(
         f"[bold green]🏠 HomerFindr[/bold green]\n"
+        f"[dim italic]Can't believe I missed another listing! Doh![/dim italic]\n"
         f"[dim]Web dashboard:[/dim] [bold cyan]{url}[/bold cyan]\n"
         f"[dim]Press Ctrl+C to stop[/dim]",
         border_style="green",
     ))
 
-    open_browser = Confirm.ask("Open in browser?", default=True)
+    import sys
+    open_browser = sys.stdin.isatty() and Confirm.ask("Open in browser?", default=True)
 
     if open_browser:
         def _open():
@@ -263,6 +265,53 @@ def report():
             console.print("[green]Email sent![/green]")
         else:
             console.print("[red]Failed to send email. Check .env SMTP settings.[/red]")
+
+
+@app.command()
+def settings(
+    edit: bool = typer.Option(False, "--edit", "-e", help="Interactively edit settings"),
+):
+    """View or edit background monitoring and notification settings."""
+    from pathlib import Path
+    from dotenv import set_key
+
+    env_path = Path.home() / ".homesearch" / ".env"
+    from homesearch.config import settings as cfg
+
+    table = Table(title="HomerFindr Settings", show_header=True, header_style="bold")
+    table.add_column("Setting", style="cyan", min_width=28)
+    table.add_column("Value")
+
+    table.add_row("Background Polling", "[green]Enabled[/green]" if cfg.background_polling_enabled else "[yellow]Disabled[/yellow]")
+    table.add_row("Poll Interval", f"{cfg.background_poll_interval_minutes} minutes")
+    table.add_row("Timezone", cfg.user_timezone or "[dim]Not set (using system default)[/dim]")
+    table.add_row("Zapier Webhook URL", cfg.zapier_webhook_url or "[dim]Not configured[/dim]")
+    table.add_row("Report Email", cfg.report_email or "[dim]Not configured[/dim]")
+    table.add_row("Daily Report Time", f"{cfg.report_hour:02d}:{cfg.report_minute:02d}")
+
+    console.print(table)
+
+    if not edit:
+        console.print("\n[dim]Run [bold]homesearch settings --edit[/bold] to change settings.[/dim]")
+        return
+
+    console.print()
+    enabled = Confirm.ask("Enable background polling?", default=cfg.background_polling_enabled)
+    interval = IntPrompt.ask("Poll interval (minutes)", default=cfg.background_poll_interval_minutes)
+    tz = Prompt.ask("Timezone (e.g. America/New_York)", default=cfg.user_timezone or "")
+    webhook = Prompt.ask("Zapier webhook URL (leave blank to clear)", default=cfg.zapier_webhook_url or "")
+
+    env_path.parent.mkdir(parents=True, exist_ok=True)
+    env_path.touch(exist_ok=True)
+
+    set_key(str(env_path), "BACKGROUND_POLLING_ENABLED", str(enabled).lower())
+    set_key(str(env_path), "BACKGROUND_POLL_INTERVAL_MINUTES", str(interval))
+    if tz:
+        set_key(str(env_path), "USER_TIMEZONE", tz)
+    set_key(str(env_path), "ZAPIER_WEBHOOK_URL", webhook)
+
+    console.print("\n[green]✓ Settings saved to ~/.homesearch/.env[/green]")
+    console.print("[dim]Restart 'homesearch serve' to apply changes.[/dim]")
 
 
 # --- Saved search subcommands ---
@@ -324,9 +373,11 @@ def saved_run(
             return
         for s in searches:
             console.print(f"\n[bold cyan]Running: {s.name}[/bold cyan]")
+            db.mark_results_not_new(s.id)
             with console.status("Searching..."):
-                results = run_search(s.criteria, search_id=s.id)
-            _display_results(results)
+                all_results = run_search(s.criteria, search_id=s.id)
+            new_results = db.get_search_results(s.id, new_only=True)
+            _display_results_with_new(new_results, len(all_results))
         return
 
     if not name:
@@ -338,10 +389,11 @@ def saved_run(
         console.print(f"[red]Search '{name}' not found. Use 'homesearch saved list' to see all.[/red]")
         return
 
+    db.mark_results_not_new(search.id)
     with console.status(f"Running '{search.name}'..."):
-        results = run_search(search.criteria, search_id=search.id)
-
-    _display_results(results)
+        all_results = run_search(search.criteria, search_id=search.id)
+    new_results = db.get_search_results(search.id, new_only=True)
+    _display_results_with_new(new_results, len(all_results))
 
 
 @saved_app.command("delete")
@@ -372,6 +424,15 @@ def saved_toggle(name: str = typer.Argument(help="Name of saved search to toggle
 
 
 # --- Helpers ---
+
+def _display_results_with_new(new_results: list[Listing], total: int):
+    """Display only new listings from a saved-search re-run."""
+    if not new_results:
+        console.print(f"[green]✓ No new listings[/green] [dim]({total} total matches unchanged)[/dim]")
+        return
+    console.print(f"\n[bold yellow]★ {len(new_results)} new listing{'s' if len(new_results) != 1 else ''}[/bold yellow] [dim](out of {total} total)[/dim]\n")
+    _display_results(new_results)
+
 
 def _display_results(results: list[Listing]):
     """Display search results in a rich table."""

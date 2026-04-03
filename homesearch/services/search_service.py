@@ -9,6 +9,7 @@ from homesearch.models import Listing, SearchCriteria
 from homesearch.providers.base import BaseProvider
 from homesearch.providers.homeharvest_provider import HomeHarvestProvider
 from homesearch.providers.redfin_provider import RedfinProvider
+from homesearch.providers.zillow_provider import ZillowProvider
 from homesearch.services.zip_service import discover_zip_codes
 from homesearch import database as db
 from homesearch.services.road_service import check_highway_proximity
@@ -19,6 +20,7 @@ def get_providers() -> list[BaseProvider]:
     providers: list[BaseProvider] = [
         HomeHarvestProvider(),
         RedfinProvider(),
+        ZillowProvider(),
     ]
     return [p for p in providers if p.enabled]
 
@@ -69,25 +71,46 @@ def run_search(
 
     for provider in providers:
         try:
-            results = provider.search(criteria, on_progress=_wrapped_progress, on_partial=on_partial)
+            zip_errors: list[str] = []
+
+            def _on_error(location: str, exc: Exception) -> None:
+                msg = f"{provider.name}/{location}: {exc}"
+                print(f"[{provider.name}] ZIP error ({location}): {exc}")
+                zip_errors.append(msg)
+
+            results = provider.search(
+                criteria,
+                on_progress=_wrapped_progress,
+                on_partial=on_partial,
+                on_error=_on_error,
+            )
             all_listings.extend(results)
+            if errors is not None and zip_errors:
+                errors.extend(zip_errors)
         except Exception as e:
             msg = f"{provider.name}: {e}"
             print(f"[{provider.name}] Error: {e}")
             if errors is not None:
                 errors.append(msg)
 
-    # Deduplicate by address (normalized)
+    # Deduplicate by address — prefer realtor source, enrich from Zillow
     seen_addresses: dict[str, Listing] = {}
     for listing in all_listings:
         key = _normalize_address(listing.address)
         if key not in seen_addresses:
             seen_addresses[key] = listing
         else:
-            # Keep the one with more data or prefer realtor (MLS source)
             existing = seen_addresses[key]
-            if _listing_quality(listing) > _listing_quality(existing):
+            # Always keep realtor as primary; enrich it with any missing Zillow fields
+            if existing.source == "realtor" and listing.source == "zillow":
+                _enrich_listing(existing, listing)
+            elif listing.source == "realtor" and existing.source == "zillow":
+                _enrich_listing(listing, existing)
                 seen_addresses[key] = listing
+            else:
+                # Both same source — keep whichever has more data
+                if _listing_quality(listing) > _listing_quality(existing):
+                    seen_addresses[key] = listing
 
     deduped = list(seen_addresses.values())
 
@@ -137,18 +160,33 @@ def run_search(
     if search_id is not None:
         previous_ids = db.get_previous_listing_ids(search_id)
         for listing in filtered:
-            lid, _prev_type = db.upsert_listing(listing)
+            lid, _prev_type, prev_price = db.upsert_listing(listing)
             listing.id = lid
             is_new = lid not in previous_ids
             db.link_search_result(search_id, lid, is_new=is_new)
+            # Record price change if listing existed and price moved
+            if prev_price is not None and listing.price is not None and listing.price != prev_price:
+                db.record_price_change(lid, prev_price, listing.price)
         db.update_search(search_id, last_run_at=datetime.now().isoformat())
 
     return filtered
 
 
+def _enrich_listing(primary: Listing, secondary: Listing) -> None:
+    """Copy missing fields from secondary into primary (non-destructive enrichment)."""
+    for field in ["year_built", "has_basement", "has_garage", "garage_spaces",
+                  "has_fireplace", "has_ac", "has_pool", "heat_type",
+                  "lot_sqft", "hoa_monthly", "stories", "house_style",
+                  "photo_url", "latitude", "longitude"]:
+        if not getattr(primary, field, None) and getattr(secondary, field, None):
+            setattr(primary, field, getattr(secondary, field))
+
+
 def _normalize_address(address: str) -> str:
     """Normalize address for dedup comparison."""
     addr = address.lower().strip()
+    # Strip ZIP codes — Zillow embeds them, Realtor does not; must remove before comparing
+    addr = re.sub(r'\b\d{5}(-\d{4})?\b', '', addr)
     # Remove unit/apartment designators
     addr = re.sub(r'\b(apt|unit|suite|ste|#)\s*\S+', '', addr)
     # Normalize street suffixes
@@ -209,9 +247,10 @@ def _score_listing(listing: Listing, criteria: SearchCriteria) -> tuple[int, lis
         else:
             badges.append(f"HOA ${listing.hoa_monthly:.0f}")
 
-    if (criteria.bedrooms_min and listing.bedrooms and listing.bedrooms >= criteria.bedrooms_min
-            and criteria.bathrooms_min and listing.bathrooms and listing.bathrooms >= criteria.bathrooms_min):
-        badges.append(f"{listing.bedrooms}bd/{listing.bathrooms}ba \u2713")
+    beds_ok = criteria.bedrooms_min and listing.bedrooms and listing.bedrooms >= criteria.bedrooms_min
+    baths_ok = criteria.bathrooms_min and listing.bathrooms and listing.bathrooms >= criteria.bathrooms_min
+    if beds_ok or baths_ok:
+        badges.append(f"{listing.bedrooms or '?'}bd/{listing.bathrooms or '?'}ba \u2713")
 
     if criteria.price_min is not None or criteria.price_max is not None:
         price_ok = True
@@ -261,42 +300,44 @@ def _perfect_score(criteria: SearchCriteria) -> int:
 
 def _passes_filters(listing: Listing, criteria: SearchCriteria) -> bool:
     """Client-side filtering for fields providers might not support natively."""
+    from homesearch.models import ListingType as _LT
 
-    # Enforce listing_type — safety net so pending/coming_soon never bleed into for-sale results
-    allowed_types: list[str] = []
-    if criteria.listing_types:
-        allowed_types = [lt.value for lt in criteria.listing_types]
-    elif criteria.listing_type:
-        allowed_types = [criteria.listing_type.value]
-    if allowed_types and listing.listing_type not in allowed_types:
-        return False
+    # Allowlist filter: only show listing types the user requested.
+    types_wanted = set(criteria.listing_types) if criteria.listing_types else (
+        {criteria.listing_type} if criteria.listing_type else set()
+    )
+    if types_wanted:
+        allowed_strs = {lt.value if hasattr(lt, 'value') else lt for lt in types_wanted}
+        if listing.listing_type and listing.listing_type not in allowed_strs:
+            return False
 
-    if criteria.price_min and listing.price and listing.price < criteria.price_min:
+    # Numeric filters: reject if value is missing or out of range.
+    if criteria.price_min is not None and (listing.price is None or listing.price < criteria.price_min):
         return False
-    if criteria.price_max and listing.price and listing.price > criteria.price_max:
-        return False
-
-    if criteria.bedrooms_min and listing.bedrooms and listing.bedrooms < criteria.bedrooms_min:
-        return False
-    if criteria.bathrooms_min and listing.bathrooms and listing.bathrooms < criteria.bathrooms_min:
+    if criteria.price_max is not None and (listing.price is None or listing.price > criteria.price_max):
         return False
 
-    if criteria.sqft_min and listing.sqft and listing.sqft < criteria.sqft_min:
+    if criteria.bedrooms_min is not None and (listing.bedrooms is None or listing.bedrooms < criteria.bedrooms_min):
         return False
-    if criteria.sqft_max and listing.sqft and listing.sqft > criteria.sqft_max:
-        return False
-
-    if criteria.lot_sqft_min and listing.lot_sqft and listing.lot_sqft < criteria.lot_sqft_min:
-        return False
-    if criteria.lot_sqft_max and listing.lot_sqft and listing.lot_sqft > criteria.lot_sqft_max:
+    if criteria.bathrooms_min is not None and (listing.bathrooms is None or listing.bathrooms < criteria.bathrooms_min):
         return False
 
-    if criteria.year_built_min and listing.year_built and listing.year_built < criteria.year_built_min:
+    if criteria.sqft_min is not None and (listing.sqft is None or listing.sqft < criteria.sqft_min):
         return False
-    if criteria.year_built_max and listing.year_built and listing.year_built > criteria.year_built_max:
+    if criteria.sqft_max is not None and (listing.sqft is None or listing.sqft > criteria.sqft_max):
         return False
 
-    if criteria.stories_min and listing.stories and listing.stories < criteria.stories_min:
+    if criteria.lot_sqft_min is not None and (listing.lot_sqft is None or listing.lot_sqft < criteria.lot_sqft_min):
+        return False
+    if criteria.lot_sqft_max is not None and (listing.lot_sqft is None or listing.lot_sqft > criteria.lot_sqft_max):
+        return False
+
+    if criteria.year_built_min is not None and (listing.year_built is None or listing.year_built < criteria.year_built_min):
+        return False
+    if criteria.year_built_max is not None and (listing.year_built is None or listing.year_built > criteria.year_built_max):
+        return False
+
+    if criteria.stories_min is not None and (listing.stories is None or listing.stories < criteria.stories_min):
         return False
 
     if criteria.has_basement is True and listing.has_basement is False:
@@ -338,11 +379,16 @@ def _passes_filters(listing: Listing, criteria: SearchCriteria) -> bool:
             return False
 
     # House style filter — fuzzy match (handles hyphens, underscores, spaces)
-    if criteria.house_styles and listing.house_style:
+    if criteria.house_styles:
         def _norm(s): return s.lower().replace("-", "_").replace(" ", "_")
-        ls = _norm(listing.house_style)
-        if not any(_norm(s) in ls or ls in _norm(s) for s in criteria.house_styles):
-            return False
+        if listing.house_style is None:
+            # strict mode: hide listings where style couldn't be detected
+            if criteria.style_strict:
+                return False
+        else:
+            ls = _norm(listing.house_style)
+            if not any(_norm(s) in ls or ls in _norm(s) for s in criteria.house_styles):
+                return False
 
     # School rating minimum
     if criteria.school_rating_min and listing.school_rating and listing.school_rating < criteria.school_rating_min:

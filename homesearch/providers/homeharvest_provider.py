@@ -26,7 +26,7 @@ class HomeHarvestProvider(BaseProvider):
     def name(self) -> str:
         return "realtor"
 
-    def search(self, criteria: SearchCriteria, on_progress=None, on_partial=None) -> list[Listing]:
+    def search(self, criteria: SearchCriteria, on_progress=None, on_partial=None, on_error=None) -> list[Listing]:
         try:
             import homeharvest
         except ImportError:
@@ -45,6 +45,14 @@ class HomeHarvestProvider(BaseProvider):
         listing_type_arg = hh_types[0] if len(hh_types) == 1 else hh_types
         default_lt = hh_types[0]
 
+        # Only exclude pending if the user didn't ask for pending OR coming_soon
+        # (both map to homeharvest "pending" type, so either selection means keep pending)
+        from homesearch.models import ListingType as _LT
+        exclude_pending = (
+            _LT.PENDING not in types_to_run and
+            _LT.COMING_SOON not in types_to_run
+        )
+
         all_listings: list[Listing] = []
 
         for progress_idx, location in enumerate(locations, start=1):
@@ -56,6 +64,15 @@ class HomeHarvestProvider(BaseProvider):
                     location=location,
                     listing_type=listing_type_arg,
                     past_days=30 if include_sold else None,
+                    exclude_pending=exclude_pending,
+                    price_min=int(criteria.price_min) if criteria.price_min else None,
+                    price_max=int(criteria.price_max) if criteria.price_max else None,
+                    beds_min=criteria.bedrooms_min,
+                    baths_min=criteria.bathrooms_min,
+                    sqft_min=criteria.sqft_min,
+                    sqft_max=criteria.sqft_max,
+                    lot_sqft_min=criteria.lot_sqft_min,
+                    year_built_min=criteria.year_built_min,
                 )
                 batch: list[Listing] = []
                 if df is not None and not df.empty:
@@ -66,8 +83,10 @@ class HomeHarvestProvider(BaseProvider):
                 all_listings.extend(batch)
                 if on_partial and batch:
                     on_partial(list(batch))
-            except Exception:
+            except Exception as exc:
                 traceback.print_exc()
+                if on_error:
+                    on_error(location, exc)
                 continue
 
         return all_listings

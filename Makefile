@@ -128,16 +128,23 @@ list-backups:
 
 # ── Release: bump version, tag, push → GitHub Actions builds installers ────────
 release:
-	@test -n "$(V)" || (echo "Usage: make release V=1.3.0" && exit 1)
-	@echo "→ Releasing v$(V)..."
-	sed -i '' 's/^version = ".*"/version = "$(V)"/' pyproject.toml
-	git add pyproject.toml
-	git commit -m "chore: bump version to $(V)"
-	git tag -a "v$(V)" -m "Release v$(V)"
-	git push origin main "v$(V)"
-	$(MAKE) backup-push
-	@echo "✓ Tag pushed → GitHub Actions will build Mac + Windows installers"
-	@echo "  https://github.com/iamtr0n/HomerFindr/actions"
+	@if [ -n "$(V)" ]; then \
+	  NEW_V="$(V)"; \
+	else \
+	  CURRENT=$$(grep '^version' pyproject.toml | head -1 | sed 's/version = "\(.*\)"/\1/'); \
+	  MAJOR=$$(echo "$$CURRENT" | cut -d. -f1); \
+	  MINOR=$$(echo "$$CURRENT" | cut -d. -f2); \
+	  PATCH=$$(echo "$$CURRENT" | cut -d. -f3); \
+	  NEW_V="$$MAJOR.$$MINOR.$$((PATCH + 1))"; \
+	fi; \
+	echo "→ Releasing v$$NEW_V..."; \
+	sed -i '' "s/^version = \".*\"/version = \"$$NEW_V\"/" pyproject.toml; \
+	git add pyproject.toml; \
+	git commit -m "chore: bump version to $$NEW_V"; \
+	git tag -a "v$$NEW_V" -m "Release v$$NEW_V"; \
+	git push origin main "v$$NEW_V"; \
+	echo "✓ Tag pushed → GitHub Actions will build Mac + Windows installers"; \
+	echo "  https://github.com/iamtr0n/HomerFindr/actions"
 
 # ── Launchers: ensure .command is executable (run after git clone) ─────────────
 launchers:

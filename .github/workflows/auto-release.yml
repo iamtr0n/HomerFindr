@@ -1,0 +1,52 @@
+name: Auto Release
+
+# Fires on every push to main — auto-bumps the patch version, tags, and lets
+# release.yml build the installers. Skips if the push is itself a version bump
+# (prevents infinite loops).
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  auto-bump:
+    name: Bump patch version + tag
+    runs-on: ubuntu-latest
+    # Skip if this commit is the version bump we just made (loop prevention)
+    if: "!startsWith(github.event.head_commit.message, 'chore: bump version')"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump patch version
+        id: bump
+        run: |
+          CURRENT=$(grep '^version' pyproject.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          MAJOR=$(echo "$CURRENT" | cut -d. -f1)
+          MINOR=$(echo "$CURRENT" | cut -d. -f2)
+          PATCH=$(echo "$CURRENT" | cut -d. -f3)
+          NEW_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
+          sed -i "s/^version = \".*\"/version = \"${NEW_VERSION}\"/" pyproject.toml
+          echo "NEW_VERSION=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Commit and tag
+        env:
+          NEW_VERSION: ${{ steps.bump.outputs.NEW_VERSION }}
+        run: |
+          git add pyproject.toml
+          git commit -m "chore: bump version to ${NEW_VERSION}"
+          git tag -a "v${NEW_VERSION}" -m "Release v${NEW_VERSION}"
+          git push origin main "v${NEW_VERSION}"

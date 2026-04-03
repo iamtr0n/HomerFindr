@@ -297,67 +297,196 @@ Configure notifications and integrations:
 
 ## 💻 CLI
 
-The CLI runs entirely in the terminal with no mouse needed. Every step is navigable with arrow keys and Enter.
+**No mouse. No browser. No typing.** The entire CLI is navigable with arrow keys and Enter — from picking a listing type to seeing results, every step is a menu.
 
-```bash
-homerfindr           # Launch the interactive TUI (default)
-homerfindr search    # Run the search wizard directly
-homerfindr serve     # Start the web server
-homerfindr saved     # Manage saved searches
-homerfindr report    # Send email report now
-```
+### How to Open It
 
-### Interactive TUI
-
-The default `homerfindr` command launches the full-screen terminal UI:
+Open **Terminal** (Mac) or **PowerShell / Command Prompt** (Windows) and type:
 
 ```
-┌─────────────────────────────────────┐
-│  🏠 HomerFindr                      │
-│  ─────────────────────────────────  │
-│  ▶  New Search                      │
-│     Saved Searches                  │
-│     Run All Saved Searches          │
-│     Open Web Dashboard              │
-│     Settings                        │
-│     Quit                            │
-└─────────────────────────────────────┘
+homerfindr
 ```
 
-### Search Wizard
+That's it. The splash screen appears, then the main menu loads.
 
-`homerfindr search` walks you through a 19-step wizard — no typing required on any step:
+> **Can't find `homerfindr`?** On Mac, open a new Terminal tab after installing (the PATH updates on next shell). On Windows, open a new PowerShell window.
 
-1. Listing type (For Sale / Rent / Sold / Pending / Coming Soon)
-2. Property type (House / Condo / Townhouse / Multi-family / etc.)
-3. Location (city, state or ZIP)
-4. Search radius
-5. ZIP code discovery and exclusion
-6. Price range
-7. Bedrooms minimum
-8. Bathrooms minimum
-9. Sqft range
-10. Lot size range
-11. Year built range
-12. Garage (yes / no / either)
-13. Basement (yes / no / either)
-14. Pool (yes / no / either)
-15. Fireplace / A/C / heat type
-16. HOA max
-17. House style
-18. School rating minimum
-19. Highway avoidance
+---
 
-After the wizard, a spinner shows live search progress across all ZIP codes. Results display in a color-coded table, ranked by match score.
+### Main Menu
 
-### Saved Search Commands
+Use **↑ ↓ arrow keys** to move, **Enter** to select:
 
-```bash
-homerfindr saved list          # list all saved searches
-homerfindr saved run <name>    # run a saved search
-homerfindr saved delete <name> # delete a saved search
-homerfindr saved toggle <name> # enable/disable alerts
 ```
+? What would you like to do?
+❯ 🏠  New Search
+  📋  Saved Searches
+  ⚙️   Settings
+  🌐  Launch Web UI
+  🚪  Exit
+```
+
+| Option | What it does |
+|--------|-------------|
+| **🏠 New Search** | Opens the search wizard — set all your filters with arrow keys, then runs the search live |
+| **📋 Saved Searches** | View, run, rename, toggle alerts, or delete your saved searches |
+| **⚙️ Settings** | Configure email reports, SMS/webhook alerts, scheduler, and display preferences |
+| **🌐 Launch Web UI** | Starts the web server and opens `http://127.0.0.1:8000` in your browser |
+| **🚪 Exit** | Closes HomerFindr |
+
+Press **Ctrl+C** at any time to exit immediately.
+
+---
+
+### New Search Wizard
+
+Selecting **New Search** walks you through every filter — no typing required on any step. Use **↑ ↓** to pick, **Enter** to confirm, **Space** to multi-select where applicable.
+
+```
+? Listing type?
+❯ For Sale
+  For Rent
+  Sold
+  Pending
+  Coming Soon
+
+? Property type? (Space to select, Enter to confirm)
+❯ ◉ Single Family
+  ○ Condo
+  ○ Townhouse
+  ○ Multi-Family
+
+? Where are you searching?
+  > Bellmore, NY
+
+? Search radius?
+❯ 5 miles
+  10 miles
+  15 miles
+  25 miles
+
+? Price range? (Space to select multiple)
+❯ ◉ $400k - $500k
+  ◉ $500k - $750k
+  ○ $750k - $1M
+
+? Minimum bedrooms?
+❯ 3+
+  4+
+  5+
+  Any
+
+? Garage?
+❯ Required
+  Excluded
+  Either
+
+? Basement?
+❯ Required
+  Excluded
+  Either
+```
+
+After the last filter, a live progress spinner runs the search across all ZIP codes in your area:
+
+```
+ Searching 8 ZIP codes...
+  ✓ 11710  Realtor.com → 12 listings
+  ✓ 11710  Redfin      →  8 listings
+  ✓ 11714  Realtor.com →  7 listings
+  ✓ 11714  Zillow      →  9 listings
+  ...
+  Found 43 listings — applying filters...
+```
+
+Results display in a ranked table — best matches first, with match score badges:
+
+```
+ ┌─────────────────────────────────────────────────────────────────────────┐
+ │  ⭐ #1  123 Oak Lane, Bellmore NY 11710                                 │
+ │  $479,000 · 4 bed · 2 bath · 1,850 sqft · Score: 9/9                  │
+ │  ✓ garage  ✓ basement  ✓ price  ✓ beds  ✓ sqft   Realtor.com · 3 days │
+ ├─────────────────────────────────────────────────────────────────────────┤
+ │  #2  456 Elm Street, Merrick NY 11566                                   │
+ │  $510,000 · 3 bed · 2 bath · 1,620 sqft · Score: 7/9                  │
+ │  ✓ garage  ✗ basement  ✓ price  ✓ beds  ✓ sqft   Redfin · 5 days      │
+ └─────────────────────────────────────────────────────────────────────────┘
+
+? What next?
+❯ Save this search
+  New search
+  Back to menu
+```
+
+---
+
+### Saved Searches
+
+Selecting **Saved Searches** shows a table of all your saved searches:
+
+```
+ ┌──────────────────────┬──────────────────┬─────────────────────┬────────┐
+ │ Name                 │ Location         │ Last Run            │ Active │
+ ├──────────────────────┼──────────────────┼─────────────────────┼────────┤
+ │ Bellmore under 550k  │ Bellmore, NY     │ 2026-04-02 08:00   │   ✓    │
+ │ Merrick 4BR          │ Merrick, NY      │ 2026-04-01 20:00   │   ✓    │
+ │ Wantagh rentals      │ Wantagh, NY      │ Never               │   ✗    │
+ └──────────────────────┴──────────────────┴─────────────────────┴────────┘
+
+? Select a search:
+❯ ← Back
+  Bellmore under 550k (Bellmore, NY)
+  Merrick 4BR (Merrick, NY)
+  Wantagh rentals (Wantagh, NY)
+```
+
+Selecting a search opens its action menu:
+
+```
+? Bellmore under 550k:
+❯ ← Back
+  Run Now
+  Set Alerts  (no webhook set)
+  Toggle Active/Inactive
+  Rename
+  Delete
+```
+
+| Action | What it does |
+|--------|-------------|
+| **Run Now** | Re-runs the search immediately and shows new results |
+| **Set Alerts** | Attach a Zapier webhook URL to this specific search |
+| **Toggle Active/Inactive** | Enable or disable scheduled auto-runs for this search |
+| **Rename** | Change the search name |
+| **Delete** | Remove the search and all its associated listings |
+
+---
+
+### Settings
+
+```
+? Settings:
+❯ ← Back
+  🔔  Notifications & Alerts
+  📧  Email & Reports
+  🔍  Search Defaults
+  🏠  Providers
+  🗄   Data & Database
+  🖥   Display & UI
+  ⏱   Scheduler
+  ℹ   About HomerFindr
+```
+
+| Section | What you configure |
+|---------|-------------------|
+| **Notifications & Alerts** | Global Zapier webhook URL, desktop notification toggle |
+| **Email & Reports** | SMTP server, report email address, daily report time |
+| **Search Defaults** | Default radius, listing type, property type for new searches |
+| **Providers** | Enable/disable Realtor.com, Redfin, or Zillow individually |
+| **Data & Database** | Database path, clear old listings, reset database |
+| **Display & UI** | Color theme, result sort order |
+| **Scheduler** | How often saved searches auto-run (default: every 60 min) |
+| **About** | Version info, links, credits |
 
 ---
 
@@ -632,19 +761,20 @@ make clean          # remove build artifacts
 
 ### Release Process
 
-```bash
-make release V=1.3.0
-```
+Releases are **fully automatic**. Every push to `main` triggers GitHub Actions to:
+1. Bump the patch version in `pyproject.toml` (e.g. `1.2.0` → `1.2.1`)
+2. Commit the version bump and create a git tag
+3. Build and attach installers to a GitHub Release (`install.sh`, `install.ps1`, `.command`, `.bat`)
+4. Update the Homebrew formula with the new sha256
 
-This will:
-1. Bump the version in `pyproject.toml`
-2. Create a git tag `v1.3.0`
-3. Push to GitHub
-4. GitHub Actions builds the release:
-   - Computes sha256 of the release tarball
-   - Updates `homebrew-formula/homerfindr.rb`
-   - Creates a GitHub Release with `install.sh`, `install.ps1`, `HomerFindr-Install.command`, and `HomerFindr-Install.bat` attached
-5. Snapshot your current database to the GitHub backups release
+**You don't need to do anything.** Just push your code changes and a new release is cut automatically.
+
+To manually cut a release (e.g. a minor or major bump):
+
+```bash
+make release          # auto-bumps patch: 1.2.0 → 1.2.1
+make release V=1.3.0  # specific version
+```
 
 ### Project Structure
 

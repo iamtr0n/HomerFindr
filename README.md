@@ -34,7 +34,23 @@ Pulls listings from Realtor.com, Redfin, and Zillow into one place — with a po
 
 ## What is HomerFindr?
 
-HomerFindr is a **local home search aggregator** that runs entirely on your machine. It queries Realtor.com (MLS), Redfin, and Zillow simultaneously and combines the results into one clean view — no duplicate listings, no paid APIs, no cloud dependency.
+You know the feeling — you open Zillow, find the perfect house, and realize it's been on the market for 18 days. The open house was two weekends ago. Someone already has an offer in. You missed it.
+
+That's not bad luck. That's how Zillow works. Their apps are designed to keep you browsing, not to get you into a home fast. Alerts are delayed, results are filtered by what they want to show you, and you're never quite seeing the full picture.
+
+**HomerFindr fixes this.**
+
+It's a home search aggregator that runs on your own machine and checks Realtor.com (MLS), Redfin, and Zillow simultaneously — on your schedule, as often as every few minutes. The moment a new listing hits any of those platforms, HomerFindr finds it, scores it against your filters, and texts you. Not tomorrow. Not "when Zillow feels like it." Now.
+
+Every listing is ranked by how well it matches *your* criteria — beds, baths, price, garage, basement, school rating, commute zone, you name it. The best matches float to the top. You see everything, deduplicated and sorted, in one place.
+
+| The old way | With HomerFindr |
+|-------------|-----------------|
+| Check 3 apps manually, multiple times a day | One dashboard, all sources, auto-refreshed |
+| Get a Zillow alert 2 weeks after listing | SMS the moment it hits any platform |
+| Miss the open house because you found it too late | First to know = first to schedule a showing |
+| Scroll through hundreds of irrelevant listings | Match scores surface your best fits instantly |
+| Lose a perfect house to a faster buyer | You're the faster buyer |
 
 It has two interfaces that share the same data:
 

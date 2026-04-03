@@ -74,6 +74,29 @@ backup:
 	ls -t "$(BACKUP_DIR)"/*.tar.gz 2>/dev/null | tail -n +8 | xargs rm -f 2>/dev/null; \
 	echo "  (keeping last 7 backups)"
 
+# ── Push latest backup to GitHub (persistent 'backups' release) ───────────────
+backup-push: backup
+	@LATEST=$$(ls -t "$(BACKUP_DIR)"/*.tar.gz | head -1); \
+	echo "→ Uploading $$(basename $$LATEST) to GitHub..."; \
+	gh release view backups >/dev/null 2>&1 || \
+	  gh release create backups \
+	    --title "Data Backups" \
+	    --notes "Database and config backups. Download any file to restore with: make restore F=<file>" \
+	    --prerelease; \
+	gh release upload backups "$$LATEST"; \
+	echo "✓ Uploaded to: https://github.com/iamtr0n/HomerFindr/releases/tag/backups"
+
+# ── Restore from GitHub (download latest backup) ───────────────────────────────
+restore-github:
+	@echo "→ Fetching latest backup from GitHub..."
+	@mkdir -p "$(BACKUP_DIR)"
+	@LATEST=$$(gh release view backups --json assets --jq '.assets | sort_by(.createdAt) | last | .browserDownloadUrl' 2>/dev/null); \
+	test -n "$$LATEST" || (echo "✗ No backups found on GitHub. Run: make backup-push" && exit 1); \
+	FILE="$(BACKUP_DIR)/$$(basename $$LATEST)"; \
+	curl -L -o "$$FILE" "$$LATEST"; \
+	echo "✓ Downloaded: $$FILE"; \
+	$(MAKE) restore F="$$FILE"
+
 # ── Restore ───────────────────────────────────────────────────────────────────
 restore:
 	@test -n "$(F)" || (echo "Usage: make restore F=~/.homesearch/backups/homerfindr_YYYYMMDD_HHMMSS.tar.gz" && exit 1)
@@ -112,6 +135,7 @@ release:
 	git commit -m "chore: bump version to $(V)"
 	git tag -a "v$(V)" -m "Release v$(V)"
 	git push origin main "v$(V)"
+	$(MAKE) backup-push
 	@echo "✓ Tag pushed → GitHub Actions will build Mac + Windows installers"
 	@echo "  https://github.com/iamtr0n/HomerFindr/actions"
 
@@ -132,6 +156,8 @@ help:
 	@echo "  make restore F=<file>   Restore from a backup .tar.gz"
 	@echo "  make setup-backup       Schedule daily auto-backup at 3 AM (macOS)"
 	@echo "  make list-backups       Show all backups on disk"
-	@echo "  make release V=x.y.z    Tag release, trigger GitHub Actions"
+	@echo "  make backup-push        Backup + upload to GitHub releases/backups"
+	@echo "  make restore-github     Download latest GitHub backup and restore"
+	@echo "  make release V=x.y.z    Tag release + snapshot backup to GitHub"
 	@echo "  make clean              Remove build artifacts"
 	@echo ""

@@ -649,23 +649,81 @@ HomerFindr is now accessible at `http://YOUR_SERVER_IP:8000`.
 
 ### Option B — Railway (Easiest, no server management)
 
-Railway deploys directly from your GitHub repo with zero server management.
+Railway deploys directly from your GitHub repo — no terminal, no SSH, no server setup. Under 15 minutes start to finish.
 
-1. Fork this repo to your GitHub account
-2. Go to [railway.app](https://railway.app) → **New Project** → **Deploy from GitHub**
-3. Select your fork
-4. In **Settings → Variables**, add:
-   ```
-   HOST=0.0.0.0
-   PORT=8000
-   ```
-5. In **Settings → Start Command**, set:
-   ```
-   homesearch serve
-   ```
-6. Railway gives you a public URL like `https://homerfindr-production.up.railway.app`
+**Step 1 — Fork the repo**
 
-> Railway's free tier has usage limits (~500 hours/month). A $5/mo plan is unlimited.
+Go to `https://github.com/iamtr0n/HomerFindr` → click **Fork** (top right). This creates your own copy under your GitHub account that Railway will deploy from.
+
+**Step 2 — Create a Railway account**
+
+Go to [railway.app](https://railway.app) and sign up with your GitHub account (free).
+
+**Step 3 — Deploy**
+
+1. Click **New Project → Deploy from GitHub repo**
+2. Select your forked HomerFindr repo
+3. Railway detects Python and starts building automatically
+
+**Step 4 — Add environment variables**
+
+In your Railway project → **Variables** tab, add these two:
+
+| Variable | Value |
+|----------|-------|
+| `HOST` | `0.0.0.0` |
+| `PORT` | `8000` |
+
+**Step 5 — Set the start command**
+
+Go to **Settings → Deploy → Start Command** and enter:
+```
+homesearch serve
+```
+
+**Step 6 — Name your project something non-obvious** ⚠️
+
+In **Settings → General → Project Name**, rename it from `homerfindr` to something random like `myhomes-xk7q` or your initials + random numbers. Your public URL is based on this name — a non-obvious name is your primary security layer (see below).
+
+**Step 7 — Open your URL**
+
+Railway gives you a public URL like:
+```
+https://myhomes-xk7q.up.railway.app
+```
+
+Bookmark it. HomerFindr is live — accessible from any browser, anywhere.
+
+> **Cost:** Free tier ~500 hours/month. The **$5/mo Hobby plan** is recommended for always-on use.
+
+---
+
+### 🔒 Security & Privacy — Read This Before Going Live
+
+HomerFindr has **no login screen by design**. Think of it like PCPartPicker — if you have the link, you can see the content. Share the link with a partner, family member, or realtor and they see your searches too. That's intentional.
+
+**What someone with your URL can see:**
+- Your saved searches and all their filters
+- Every listing in your database, including starred and dismissed
+- Your Settings page — **including your Zapier webhook URL**
+
+**What they cannot do:**
+- See your phone number (it's never stored in HomerFindr)
+- They'd need your URL first — which is why Step 6 (non-obvious name) matters
+
+**The one real risk — Zapier webhook abuse**
+
+If you configure a Zapier webhook in Settings and someone finds your URL, they could use that webhook URL to send spam SMS messages to your phone. This is the only meaningful security concern with running HomerFindr publicly.
+
+**How to handle it (pick one or combine):**
+
+| Option | How to do it |
+|--------|-------------|
+| **Don't set the webhook on the cloud version** ✅ Recommended | Leave the Zapier webhook blank in Settings on your Railway instance. Run SMS alerts from your local install only. You get cloud browsing + local notifications with zero exposure. |
+| **Use a non-obvious project name** | `myhomes-xk7q` is effectively unguessable. Random internet scanners won't find it. |
+| **Enable Railway private networking** | Railway dashboard → **Settings → Networking** → enable **Private**. Adds a password prompt. No code changes needed. |
+
+**Bottom line:** Rename the project to something random + leave the webhook blank on the cloud version. That's it — you get full functionality with zero risk.
 
 ---
 
@@ -705,11 +763,10 @@ HomerFindr now runs at `https://yourdomain.com` with a valid SSL certificate tha
 
 ---
 
-### Security Note
+### Optional: Password Protection with Nginx (VPS only)
 
-HomerFindr has **no built-in authentication**. If you expose it publicly, anyone who finds the URL can see your searches and listings.
+If you want to lock down a VPS install with a username/password prompt:
 
-**Quick password protection with Nginx:**
 ```bash
 sudo apt install apache2-utils -y
 sudo htpasswd -c /etc/nginx/.htpasswd yourusername
@@ -721,7 +778,9 @@ auth_basic "HomerFindr";
 auth_basic_user_file /etc/nginx/.htpasswd;
 ```
 
-Then `sudo systemctl reload nginx`. Your browser will prompt for a username and password before showing the dashboard.
+Then `sudo systemctl reload nginx`. Your browser will prompt for credentials before showing the dashboard.
+
+> For Railway, use the built-in **Private Networking** option in the Railway dashboard instead — no Nginx needed.
 
 ---
 

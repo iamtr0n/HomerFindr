@@ -152,7 +152,9 @@ class ComparableSale(BaseModel):
 
     address: str
     price: float
+    list_price: Optional[float] = None   # original list price (for sold/list ratio)
     sqft: Optional[int] = None
+    lot_sqft: Optional[int] = None
     price_per_sqft: Optional[float] = None
     bedrooms: Optional[int] = None
     bathrooms: Optional[float] = None
@@ -160,7 +162,9 @@ class ComparableSale(BaseModel):
     has_garage: Optional[bool] = None
     has_basement: Optional[bool] = None
     days_on_mls: Optional[int] = None
+    days_since_sold: Optional[int] = None  # recency for weighting
     zip_code: str = ""
+    recency_weight: float = 1.0  # higher = more recent = more weight
 
 
 class LogicalOffer(BaseModel):
@@ -168,7 +172,7 @@ class LogicalOffer(BaseModel):
 
     estimated_value: float
     price_per_sqft_comps: float
-    offer_low: float       # conservative (3-5% below estimate)
+    offer_low: float       # conservative
     offer_fair: float      # at or near estimate
     offer_strong: float    # above estimate (competitive market)
     value_assessment: str  # "underpriced", "fairly_priced", "overpriced"
@@ -176,6 +180,9 @@ class LogicalOffer(BaseModel):
     comp_count: int
     confidence: str        # "high", "medium", "low"
     adjustments: dict      # breakdown of feature adjustments applied
+    market_overbid_ratio: Optional[float] = None  # avg sold/list (>1.0 = hot market)
+    avg_days_on_market: Optional[float] = None    # how fast comps sold
+    market_condition: str = "balanced"            # "hot", "balanced", "cool"
 
 
 class AIOfferEstimate(BaseModel):
@@ -187,6 +194,7 @@ class AIOfferEstimate(BaseModel):
     confidence: str        # "high", "medium", "low"
     reasoning: str
     market_assessment: str
+    condition_assessment: str = ""   # photo-based condition / style era analysis
     negotiation_tips: list[str]
     red_flags: list[str] = Field(default_factory=list)
 

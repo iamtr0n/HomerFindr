@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Calculator, TrendingDown, DollarSign, PieChart, Table2, Home, Percent, ChevronDown, ChevronUp } from 'lucide-react'
 import { useMortgage } from '../components/MortgageBar'
 
@@ -238,10 +239,14 @@ const TABS = [
 
 export default function MortgageCalculator() {
   const { settings: globalSettings } = useMortgage()
+  const [searchParams] = useSearchParams()
 
-  // Loan inputs — seed from global mortgage bar settings
-  const [homePrice, setHomePrice] = useState(400000)
-  const [downAmt, setDownAmt] = useState(() => Math.round(400000 * ((globalSettings.downPct || 20) / 100)))
+  // Seed home price from ?price= param (set by "Mortgage Calc →" on listing cards)
+  const seedPrice = parseInt(searchParams.get('price') || '0', 10) || 400000
+
+  // Loan inputs — seed from URL param or global mortgage bar settings
+  const [homePrice, setHomePrice] = useState(seedPrice)
+  const [downAmt, setDownAmt] = useState(() => Math.round(seedPrice * ((globalSettings.downPct || 20) / 100)))
   const [rate, setRate] = useState(globalSettings.rate || 7.0)
   const [termYears, setTermYears] = useState(globalSettings.termYears || 30)
   const [propTaxRate, setPropTaxRate] = useState(1.2)   // % of home price annually

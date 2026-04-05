@@ -54,6 +54,8 @@ class Settings(BaseSettings):
         # Read from both the home dir config and any local .env (local wins)
         "env_file": [str(Path.home() / ".homesearch" / ".env"), ".env"],
         "env_file_encoding": "utf-8",
+        # Ignore unknown env vars so future additions don't crash older installs
+        "extra": "ignore",
     }
 
 

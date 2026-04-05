@@ -1,8 +1,8 @@
 class Homerfindr < Formula
   desc "Universal home search aggregator — find homes across all platforms in one place"
   homepage "https://github.com/iamtr0n/HomerFindr"
-  url "https://github.com/iamtr0n/HomerFindr/archive/refs/tags/v1.2.0.tar.gz"
-  version "1.2.0"
+  url "https://github.com/iamtr0n/HomerFindr/archive/refs/tags/v1.2.3.tar.gz"
+  version "1.2.3"
   # sha256 is updated automatically by GitHub Actions on each `make release V=x.y.z`
   sha256 "UPDATED_BY_CI"
 

@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import { ExternalLink, Bed, Bath, Ruler, Calendar, Home, Bookmark, X } from 'lucide-react'
+import OfferEstimate from './OfferEstimate'
 
 const LISTING_TYPE_STYLES = {
   sale:        { label: 'For Sale',    cls: 'bg-match-strong/70 text-white border border-match-strong' },
@@ -295,6 +296,13 @@ export default function PropertyCard({ listing, isGoldStar = false, isViewed = f
 
         {/* Property type */}
         <p className="text-xs text-canvas-500 capitalize mb-3">{(property_type || '').replace('_', ' ')}</p>
+
+        {/* Offer estimate */}
+        {(listing_type === 'sale' || listing_type === 'pending') && listing.price && (
+          <div className="mb-3">
+            <OfferEstimate listing={listing} />
+          </div>
+        )}
 
         {/* View + Save row */}
         <div className="flex gap-2">

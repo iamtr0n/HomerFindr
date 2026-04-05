@@ -25,6 +25,7 @@ class Settings(BaseSettings):
 
     # Optional paid API keys
     rapidapi_key: str = ""
+    anthropic_api_key: str = ""
 
     # Global Zapier webhook — fires for all saved searches that don't override it
     zapier_webhook_url: str = ""

@@ -7,6 +7,7 @@ import NewSearch from './pages/NewSearch'
 import SearchResults from './pages/SearchResults'
 import Settings from './pages/Settings'
 import MapView from './pages/MapView'
+import MortgageCalculator from './pages/MortgageCalculator'
 import { api } from './api'
 import MortgageBar, { MortgageProvider } from './components/MortgageBar'
 
@@ -54,6 +55,10 @@ function Nav() {
           <Link to="/map" className={`flex items-center gap-1 px-1.5 sm:px-4 py-1.5 text-xs sm:text-sm rounded-md transition-colors whitespace-nowrap ${isActive('/map') ? 'text-amber-400 font-medium' : 'text-ink-secondary hover:text-ink-primary'}`}>
             <Map size={14} />
             Map
+          </Link>
+          <Link to="/mortgage" className={`flex items-center gap-1 px-1.5 sm:px-4 py-1.5 text-xs sm:text-sm rounded-md transition-colors whitespace-nowrap ${isActive('/mortgage') ? 'text-amber-400 font-medium' : 'text-ink-secondary hover:text-ink-primary'}`}>
+            <span className="sm:hidden">Calc</span>
+            <span className="hidden sm:inline">Mortgage</span>
           </Link>
           <Link to="/settings" className={`px-1.5 sm:px-4 py-1.5 text-xs sm:text-sm rounded-md transition-colors whitespace-nowrap ${isActive('/settings') ? 'text-amber-400 font-medium' : 'text-ink-secondary hover:text-ink-primary'}`}>
             Settings
@@ -114,6 +119,7 @@ export default function App() {
               <Route path="/search/:id/results" element={<SearchResults />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/map" element={<MapView />} />
+              <Route path="/mortgage" element={<MortgageCalculator />} />
             </Routes>
           </main>
         </div>

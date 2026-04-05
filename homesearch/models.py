@@ -147,6 +147,60 @@ class SavedSearch(BaseModel):
     notification_settings: NotificationSettings = Field(default_factory=NotificationSettings)
 
 
+class ComparableSale(BaseModel):
+    """A sold listing used as a comp for offer estimation."""
+
+    address: str
+    price: float
+    sqft: Optional[int] = None
+    price_per_sqft: Optional[float] = None
+    bedrooms: Optional[int] = None
+    bathrooms: Optional[float] = None
+    year_built: Optional[int] = None
+    has_garage: Optional[bool] = None
+    has_basement: Optional[bool] = None
+    days_on_mls: Optional[int] = None
+    zip_code: str = ""
+
+
+class LogicalOffer(BaseModel):
+    """CMA-based offer estimate derived from comparable sales."""
+
+    estimated_value: float
+    price_per_sqft_comps: float
+    offer_low: float       # conservative (3-5% below estimate)
+    offer_fair: float      # at or near estimate
+    offer_strong: float    # above estimate (competitive market)
+    value_assessment: str  # "underpriced", "fairly_priced", "overpriced"
+    price_vs_estimate_pct: float  # positive = listing is above estimate
+    comp_count: int
+    confidence: str        # "high", "medium", "low"
+    adjustments: dict      # breakdown of feature adjustments applied
+
+
+class AIOfferEstimate(BaseModel):
+    """Claude-powered offer analysis."""
+
+    suggested_offer: float
+    offer_range_low: float
+    offer_range_high: float
+    confidence: str        # "high", "medium", "low"
+    reasoning: str
+    market_assessment: str
+    negotiation_tips: list[str]
+    red_flags: list[str] = Field(default_factory=list)
+
+
+class OfferEstimate(BaseModel):
+    """Combined offer estimate from logical CMA and AI analysis."""
+
+    listing_price: Optional[float]
+    logical: Optional[LogicalOffer] = None
+    ai: Optional[AIOfferEstimate] = None
+    comps: list[ComparableSale] = Field(default_factory=list)
+    error: Optional[str] = None
+
+
 class ZipInfo(BaseModel):
     """ZIP code info for the discovery feature."""
 

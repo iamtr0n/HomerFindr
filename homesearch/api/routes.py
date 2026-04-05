@@ -776,6 +776,16 @@ def get_dismissed(request: Request):
     return {"dismissed": list(db.get_dismissed_source_ids(session_id=session_id))}
 
 
+# --- Offer estimation ---
+
+@app.post("/api/offer-estimate")
+def get_offer_estimate(listing: Listing):
+    """Run logical CMA + optional AI offer estimate for a listing."""
+    from homesearch.services.offer_service import get_offer_estimate as _estimate
+    result = _estimate(listing)
+    return result.model_dump()
+
+
 # --- Polygon → zip codes endpoint ---
 
 @app.post("/api/zips/from-polygon")

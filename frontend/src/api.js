@@ -119,6 +119,12 @@ export const api = {
   subscribePush: (sub) => request('/push/subscribe', { method: 'POST', body: JSON.stringify(sub) }),
   unsubscribePush: (id) => request(`/push/subscribe/${id}`, { method: 'DELETE' }),
 
+  // Offer estimation
+  getOfferEstimate: (listing) => request('/offer-estimate', {
+    method: 'POST',
+    body: JSON.stringify(listing),
+  }),
+
   // Dismissed listings (server-side sync)
   getDismissed: () => request('/listings/dismissed'),
   dismissListing: (sourceId) => request(`/listings/${encodeURIComponent(sourceId)}/dismiss`, { method: 'POST' }),

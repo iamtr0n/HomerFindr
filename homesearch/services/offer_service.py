@@ -218,15 +218,17 @@ def calculate_logical_offer(listing: Listing, comps: list[ComparableSale]) -> Op
     total_adjustment = sum(adjustments.values())
     estimated_value = base_value + total_adjustment
 
-    # --- Market condition from sold/list ratios ---
+    # --- Market condition from sold/list ratios (proper weighted average) ---
     overbid_ratio = None
     market_condition = "balanced"
-    ratios = []
+    weighted_ratio_sum = 0.0
+    weight_sum = 0.0
     for c in comps:
         if c.list_price and c.list_price > 0 and c.price > 0:
-            ratios.append((c.price / c.list_price) * c.recency_weight)
-    if ratios:
-        overbid_ratio = round(sum(ratios) / len(ratios), 3)
+            weighted_ratio_sum += (c.price / c.list_price) * c.recency_weight
+            weight_sum += c.recency_weight
+    if weight_sum > 0:
+        overbid_ratio = round(weighted_ratio_sum / weight_sum, 3)
         if overbid_ratio > 1.03:
             market_condition = "hot"
         elif overbid_ratio < 0.97:
@@ -343,12 +345,12 @@ Return only valid JSON, no markdown."""
         )
 
         import json
+        import re
         text = response.content[0].text.strip()
-        if text.startswith("```"):
-            text = text.split("```")[1]
-            if text.startswith("json"):
-                text = text[4:]
-        data = json.loads(text.strip())
+        m = re.search(r'```(?:json)?\s*\n?(.*?)\n?```', text, re.DOTALL)
+        if m:
+            text = m.group(1).strip()
+        data = json.loads(text)
 
         return AIOfferEstimate(
             suggested_offer=float(data["suggested_offer"]),
@@ -357,6 +359,7 @@ Return only valid JSON, no markdown."""
             confidence=str(data.get("confidence", "medium")),
             reasoning=str(data.get("reasoning", "")),
             market_assessment=str(data.get("market_assessment", "")),
+            condition_assessment=str(data.get("condition_assessment", "")),
             negotiation_tips=[str(t) for t in data.get("negotiation_tips", [])],
             red_flags=[str(f) for f in data.get("red_flags", [])],
         )

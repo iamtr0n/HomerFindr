@@ -229,13 +229,20 @@ export default function PropertyCard({ listing, isGoldStar = false, isViewed = f
                 <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-canvas-700 text-ink-muted">SOLD</span>
               )}
             </div>
-            {listing_type === 'sold' && list_price && (
+            {listing_type === 'sold' && list_price && list_price > 1000 && (
               <p className="text-xs text-ink-muted mt-0.5">
                 Asked <span className="font-mono">${list_price.toLocaleString()}</span>
-                {price && list_price && (
-                  <span className={`ml-1.5 font-medium ${price > list_price ? 'text-red-400' : 'text-green-400'}`}>
-                    ({price > list_price ? '+' : ''}{Math.round((price - list_price) / list_price * 100)}% {price > list_price ? 'over' : 'under'} ask)
-                  </span>
+                {price && price !== list_price && (() => {
+                  const pct = Math.round((price - list_price) / list_price * 100)
+                  if (Math.abs(pct) > 50) return null  // sanity: ignore bad scraper data
+                  return (
+                    <span className={`ml-1.5 font-medium ${pct > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                      ({pct > 0 ? '+' : ''}{pct}% {pct > 0 ? 'over' : 'under'} ask)
+                    </span>
+                  )
+                })()}
+                {price && price === list_price && (
+                  <span className="ml-1.5 text-ink-muted">(at ask)</span>
                 )}
               </p>
             )}

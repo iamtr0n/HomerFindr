@@ -25,7 +25,7 @@ function haversineDistance(lat1, lng1, lat2, lng2) {
  * Applies a 1.35x road factor to convert straight-line to driving distance.
  */
 export function estimateCommute(homeLat, homeLng, workLat, workLng) {
-  if (!homeLat || !homeLng || !workLat || !workLng) return null
+  if (homeLat == null || homeLng == null || workLat == null || workLng == null) return null
   const distanceMiles = haversineDistance(homeLat, homeLng, workLat, workLng) * 1.35
   return Math.round((distanceMiles / AVG_SPEED_MPH) * 60)
 }

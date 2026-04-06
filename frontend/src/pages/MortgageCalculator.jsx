@@ -110,8 +110,8 @@ function PaymentBreakdown({ items }) {
           offset += pct
           return el
         })}
-        <text x="50" y="46" textAnchor="middle" className="fill-ink-base" fontSize="9" fontWeight="600">{fmt(total)}</text>
-        <text x="50" y="57" textAnchor="middle" className="fill-ink-muted" fontSize="7">/month</text>
+        <text x="50" y="46" textAnchor="middle" style={{ fill: 'var(--ink-primary)' }} fontSize="9" fontWeight="600">{fmt(total)}</text>
+        <text x="50" y="57" textAnchor="middle" style={{ fill: 'var(--ink-muted)' }} fontSize="7">/month</text>
       </svg>
       <div className="space-y-1.5">
         {items.map(item => (
@@ -300,17 +300,18 @@ export default function MortgageCalculator() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-canvas-900 border border-canvas-700 rounded-xl p-1 w-fit">
+      <div className="flex flex-wrap gap-1 bg-canvas-900 border border-canvas-700 rounded-xl p-1 w-fit max-w-full">
         {TABS.map(({ id, label, Icon }) => (
           <button
             key={id}
             onClick={() => setTab(id)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors ${
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs sm:text-sm rounded-lg transition-colors ${
               tab === id ? 'bg-amber-500/20 text-amber-400 font-medium' : 'text-ink-muted hover:text-ink-base'
             }`}
           >
             <Icon size={13} />
-            {label}
+            <span className="hidden xs:inline">{label}</span>
+            <span className="xs:hidden">{label.split(' ')[0]}</span>
           </button>
         ))}
       </div>
@@ -455,7 +456,7 @@ export default function MortgageCalculator() {
           {tab === 'amortization' && (
             <div className="bg-canvas-900 border border-canvas-700 rounded-2xl p-5 space-y-4">
               <p className="text-sm font-semibold text-ink-base flex items-center gap-2"><Table2 size={14} className="text-amber-400" /> Amortization Schedule</p>
-              <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
                 <div className="bg-canvas-800 rounded-xl p-3">
                   <p className="text-xs text-ink-muted">Total interest</p>
                   <p className="text-lg font-bold text-red-400 font-mono">{fmt(totalInterest, true)}</p>

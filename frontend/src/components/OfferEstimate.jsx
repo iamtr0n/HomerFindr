@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
-import { TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp, Sparkles, Calculator, AlertTriangle, Flame, Snowflake, Scale, Camera } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp, Sparkles, Calculator, AlertTriangle, Flame, Snowflake, Scale, Camera, ArrowRight } from 'lucide-react'
 
 function fmt(n) {
   if (!n && n !== 0) return '—'
@@ -245,14 +245,13 @@ export default function OfferEstimate({ listing }) {
             onClick={openInCalculator}
             className="flex items-center gap-1.5 text-xs font-medium text-amber-400/80 hover:text-amber-400 transition-colors py-1"
           >
-            <Calculator size={12} />
-            Mortgage Calc →
+            Mortgage Calc <ArrowRight size={11} />
           </button>
         )}
       </div>
 
       {open && (
-        <div className="mt-3 border border-canvas-600 rounded-xl bg-canvas-800/60 p-4 space-y-5">
+        <div className="mt-3 border border-canvas-600 rounded-xl bg-canvas-800/60 p-4 space-y-5 max-h-[32rem] overflow-y-auto">
           {loading && (
             <div className="flex items-center gap-2 text-sm text-ink-muted py-2">
               <span className="animate-spin inline-block w-3.5 h-3.5 border-2 border-match-good border-t-transparent rounded-full" />

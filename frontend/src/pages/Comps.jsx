@@ -36,7 +36,7 @@ export default function Comps() {
       )}
 
       {isError && (
-        <p className="text-sm text-red-400 py-4">Failed to load comparable sales. Please try again.</p>
+        <p className="text-sm text-red-400 py-4">Could not find this listing — try opening it from the dashboard.</p>
       )}
 
       {!isLoading && !isError && comps.length === 0 && (

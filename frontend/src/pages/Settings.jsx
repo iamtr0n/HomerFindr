@@ -138,6 +138,7 @@ export default function Settings() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['scheduler'] }),
   })
 
+  const [cliLaunched, setCliLaunched] = useState(null) // null | 'ok' | 'err'
   const [aiKey, setAiKey] = useState('')
   const [openaiKey, setOpenaiKey] = useState('')
   const [googleKey, setGoogleKey] = useState('')
@@ -306,7 +307,7 @@ export default function Settings() {
               variant="default"
               size="sm"
               className="w-full"
-              onClick={() => api.openCli().catch(() => {})}
+              onClick={() => api.openCli().then(() => setCliLaunched('ok')).catch(() => setCliLaunched('err'))}
             >
               <Terminal size={13} />
               Open in Terminal
@@ -319,7 +320,7 @@ export default function Settings() {
               variant="default"
               size="sm"
               className="w-full"
-              onClick={() => api.openCli().catch(() => {})}
+              onClick={() => api.openCli().then(() => setCliLaunched('ok')).catch(() => setCliLaunched('err'))}
             >
               <Terminal size={13} />
               Open in CMD
@@ -327,6 +328,8 @@ export default function Settings() {
             <p className="text-xs text-ink-muted font-mono bg-canvas-800 border border-canvas-700 rounded px-2 py-1.5 select-all">homesearch</p>
           </div>
         </div>
+        {cliLaunched === 'ok' && <p className="text-xs text-match-strong">✓ Terminal opened — check your taskbar if it's not in front</p>}
+        {cliLaunched === 'err' && <p className="text-xs text-red-400">Could not open terminal automatically — run <code className="font-mono">homesearch</code> manually</p>}
         <p className="text-xs text-ink-muted">
           Or install first: <code className="text-amber-400/80">pip install homefindr</code> · then run <code className="text-amber-400/80">homesearch</code>
         </p>

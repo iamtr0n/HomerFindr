@@ -810,12 +810,19 @@ def get_offer_estimate(listing: Listing):
 @app.get("/api/listings/{listing_id}/comps")
 def get_listing_comps(listing_id: int):
     """Fetch recently sold comparable listings for a saved listing."""
+    import traceback
     listing = db.get_listing_by_id(listing_id)
     if not listing:
-        raise HTTPException(404, "Listing not found")
-    from homesearch.services.offer_service import get_comparable_listings
-    comps = get_comparable_listings(listing)
-    return {"comps": [c.model_dump() for c in comps], "total": len(comps)}
+        # Try fetching from all listings (in case the listing isn't in DB but was passed by id)
+        raise HTTPException(404, f"Listing {listing_id} not found in database")
+    try:
+        from homesearch.services.offer_service import get_comparable_listings
+        comps = get_comparable_listings(listing)
+        return {"comps": [c.model_dump() for c in comps], "total": len(comps)}
+    except Exception as e:
+        traceback.print_exc()
+        # Return empty rather than a 500 — comps are best-effort
+        return {"comps": [], "total": 0, "error": str(e)}
 
 
 # --- Polygon → zip codes endpoint ---
@@ -879,8 +886,11 @@ def open_cli():
     try:
         if system == "Darwin":
             subprocess.Popen([
-                "osascript", "-e",
-                f'tell application "Terminal" to do script "{cmd}" activate',
+                "osascript",
+                "-e", "tell application \"Terminal\"",
+                "-e", "activate",
+                "-e", f"do script \"{cmd}\"",
+                "-e", "end tell",
             ])
         elif system == "Windows":
             subprocess.Popen(

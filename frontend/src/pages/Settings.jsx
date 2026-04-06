@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api'
-import { Save, Loader2, CheckCircle, XCircle, FlaskConical, Webhook, Mail, Clock, Copy, Check, Plus, Trash2, Radio, MapPin, Sparkles, ShieldCheck } from 'lucide-react'
+import { Save, Loader2, CheckCircle, XCircle, FlaskConical, Webhook, Mail, Clock, Copy, Check, Plus, Trash2, Radio, MapPin, Sparkles, ShieldCheck, Terminal } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 
 function Section({ icon: Icon, title, children }) {
@@ -291,6 +291,45 @@ export default function Settings() {
           </div>
           <p className="text-xs text-ink-muted">Get a key at <span className="text-amber-400/80">aistudio.google.com</span> · Has Google Search grounding</p>
         </div>
+      </Section>
+
+      {/* CLI Access */}
+      <Section icon={Terminal} title="CLI Access">
+        <p className="text-xs text-ink-muted -mt-1">
+          Launch the interactive search wizard directly from your terminal.
+          The button opens a new terminal window and starts <code className="text-amber-400/80">homesearch</code>.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-ink-muted uppercase tracking-widest">macOS</p>
+            <Button
+              variant="default"
+              size="sm"
+              className="w-full"
+              onClick={() => api.openCli().catch(() => {})}
+            >
+              <Terminal size={13} />
+              Open in Terminal
+            </Button>
+            <p className="text-xs text-ink-muted font-mono bg-canvas-800 border border-canvas-700 rounded px-2 py-1.5 select-all">homesearch</p>
+          </div>
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-ink-muted uppercase tracking-widest">Windows</p>
+            <Button
+              variant="default"
+              size="sm"
+              className="w-full"
+              onClick={() => api.openCli().catch(() => {})}
+            >
+              <Terminal size={13} />
+              Open in CMD
+            </Button>
+            <p className="text-xs text-ink-muted font-mono bg-canvas-800 border border-canvas-700 rounded px-2 py-1.5 select-all">homesearch</p>
+          </div>
+        </div>
+        <p className="text-xs text-ink-muted">
+          Or install first: <code className="text-amber-400/80">pip install homefindr</code> · then run <code className="text-amber-400/80">homesearch</code>
+        </p>
       </Section>
 
       {/* Background Monitor */}

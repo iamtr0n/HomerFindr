@@ -605,6 +605,7 @@ def get_starred_listings(session_id: str = "default") -> list[Listing]:
         rows = conn.execute(
             """
             SELECT l.*, sl.starred_at,
+                   1 AS is_starred,
                    COALESCE(MAX(sr.is_new), 0) AS is_new
             FROM listings l
             JOIN starred_listings sl ON l.id = sl.listing_id AND sl.session_id = ?

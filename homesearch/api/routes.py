@@ -867,6 +867,38 @@ def zips_from_polygon(body: dict):
     return {"zip_codes": matching[:50]}  # cap at 50 zips
 
 
+# --- CLI launcher ---
+
+@app.post("/api/system/open-cli")
+def open_cli():
+    """Open a terminal window running the homesearch CLI (local machine only)."""
+    import platform
+    import subprocess
+    system = platform.system()
+    cmd = "homesearch"
+    try:
+        if system == "Darwin":
+            subprocess.Popen([
+                "osascript", "-e",
+                f'tell application "Terminal" to do script "{cmd}" activate',
+            ])
+        elif system == "Windows":
+            subprocess.Popen(
+                ["cmd.exe", "/k", cmd],
+                creationflags=subprocess.CREATE_NEW_CONSOLE,
+            )
+        else:
+            for term in ["gnome-terminal", "xterm", "konsole", "xfce4-terminal"]:
+                try:
+                    subprocess.Popen([term, "-e", cmd])
+                    break
+                except FileNotFoundError:
+                    continue
+        return {"success": True, "platform": system}
+    except Exception as e:
+        return {"success": False, "error": str(e), "platform": system}
+
+
 # --- Serve frontend static files ---
 
 FRONTEND_DIR = Path(__file__).parent.parent.parent / "frontend" / "dist"

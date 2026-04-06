@@ -35,10 +35,10 @@ export default function Dashboard() {
   const totalProperties = searches.reduce((sum, s) => sum + (s.result_count || 0), 0)
   const activeSearches = searches.filter(s => s.is_active).length
 
-  const starredQuery = useQuery({ queryKey: ['starred'], queryFn: api.getStarredListings })
+  const starredQuery = useQuery({ queryKey: ['starred'], queryFn: api.getStarredListings, refetchInterval: 20000 })
   const starredListings = starredQuery.data?.listings || []
 
-  const allListingsQuery = useQuery({ queryKey: ['all-listings'], queryFn: api.getAllListings })
+  const allListingsQuery = useQuery({ queryKey: ['all-listings'], queryFn: api.getAllListings, refetchInterval: 30000 })
   const dismissedQuery = useQuery({ queryKey: ['dismissed'], queryFn: api.getDismissed })
   const dismissedIds = useMemo(() => new Set(dismissedQuery.data?.dismissed || []), [dismissedQuery.data])
 
@@ -183,7 +183,10 @@ export default function Dashboard() {
     onError: (_err, _id, context) => {
       if (context?.previous) queryClient.setQueryData(['starred'], context.previous)
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['starred'] }),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['starred'] })
+      queryClient.invalidateQueries({ queryKey: ['all-listings'] })
+    },
   })
 
   const [alertsOpen, setAlertsOpen] = useState(null)
@@ -397,8 +400,16 @@ export default function Dashboard() {
                     <Clock size={11} />
                     {s.last_run_at ? `Last run: ${new Date(s.last_run_at).toLocaleString()}` : 'Never run'}
                   </p>
-                  {s.result_count != null && (
-                    <p className="text-xs font-mono text-amber-500">{s.result_count.toLocaleString()} properties</p>
+                  {s.last_run_at && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {s.result_count != null && (
+                        <span className="text-xs font-mono text-amber-500">{s.result_count.toLocaleString()} found</span>
+                      )}
+                      {s.new_count > 0
+                        ? <span className="text-xs font-mono text-match-strong">+{s.new_count} new</span>
+                        : <span className="text-xs text-ink-muted italic">no new listings</span>
+                      }
+                    </div>
                   )}
                 </div>
 

@@ -67,6 +67,7 @@ export const api = {
     method: 'PATCH',
     body: JSON.stringify({ is_active }),
   }),
+  openCli: () => request('/system/open-cli', { method: 'POST' }),
   getResults: (id, newOnly = false) => request(`/searches/${id}/results?new_only=${newOnly}`),
   markSeen: (id) => request(`/searches/${id}/mark-seen`, { method: 'POST' }),
   // FIX-01: verified — paths match, no double /api prefix

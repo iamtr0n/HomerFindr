@@ -25,7 +25,11 @@ class Settings(BaseSettings):
 
     # Optional paid API keys
     rapidapi_key: str = ""
+    # AI provider keys — add any to enable offer analysis.
+    # Priority: anthropic → openai → google
     anthropic_api_key: str = ""
+    openai_api_key: str = ""
+    google_api_key: str = ""
 
     # Global Zapier webhook — fires for all saved searches that don't override it
     zapier_webhook_url: str = ""

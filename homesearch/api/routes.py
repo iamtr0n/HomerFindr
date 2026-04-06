@@ -356,6 +356,10 @@ def get_all_settings():
         "work_address": settings.work_address,
         "work_lat": settings.work_lat,
         "work_lng": settings.work_lng,
+        # AI — never return keys, only whether each provider is configured
+        "anthropic_api_key_set": bool(settings.anthropic_api_key),
+        "openai_api_key_set": bool(settings.openai_api_key),
+        "google_api_key_set": bool(settings.google_api_key),
     }
 
 
@@ -369,6 +373,9 @@ class SettingsUpdateRequest(BaseModel):
     report_minute: Optional[int] = None
     zapier_webhook_url: Optional[str] = None
     work_address: Optional[str] = None
+    anthropic_api_key: Optional[str] = None
+    openai_api_key: Optional[str] = None
+    google_api_key: Optional[str] = None
 
 
 @app.put("/api/settings")
@@ -389,6 +396,9 @@ def update_all_settings(req: SettingsUpdateRequest):
         "report_hour": "REPORT_HOUR",
         "report_minute": "REPORT_MINUTE",
         "zapier_webhook_url": "ZAPIER_WEBHOOK_URL",
+        "anthropic_api_key": "ANTHROPIC_API_KEY",
+        "openai_api_key": "OPENAI_API_KEY",
+        "google_api_key": "GOOGLE_API_KEY",
     }
     updated = []
     for field, env_key in field_map.items():

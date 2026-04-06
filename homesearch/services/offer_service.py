@@ -289,22 +289,9 @@ def calculate_logical_offer(listing: Listing, comps: list[ComparableSale]) -> Op
 
 # --- AI estimate with photo analysis ---
 
-def calculate_ai_offer(listing: Listing, comps: list[ComparableSale], logical: Optional[LogicalOffer]) -> Optional[AIOfferEstimate]:
-    """Claude Sonnet offer analysis with optional photo-based condition assessment."""
-    from homesearch.config import settings
-
-    if not settings.anthropic_api_key:
-        return None
-
-    try:
-        import anthropic
-
-        client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
-
-        comp_summary = _build_comp_summary(comps, logical)
-        listing_summary = _build_listing_summary(listing)
-
-        prompt_text = f"""You are an expert real estate analyst helping a buyer decide how much to offer on a home.
+def _build_ai_prompt(listing_summary: str, comp_summary: str, logical: Optional["LogicalOffer"], has_photo: bool) -> str:
+    """Build the shared prompt text used by all AI providers."""
+    return f"""You are an expert real estate analyst helping a buyer decide how much to offer on a home.
 
 LISTING DETAILS:
 {listing_summary}
@@ -314,7 +301,7 @@ COMPARABLE SOLD HOMES (last 12 months, nearby, weighted by recency):
 
 {_market_context(logical)}
 
-{"PHOTO ANALYSIS: Review the listing photo provided and assess the home's visible condition, style era, and whether it appears recently renovated or updated. Factor this into your offer recommendation." if listing.photo_url else ""}
+{"PHOTO ANALYSIS: Review the listing photo and assess visible condition, style era, and whether the home appears recently renovated. Factor this into your recommendation." if has_photo else ""}
 
 Provide a JSON response with these exact fields:
 {{
@@ -331,48 +318,121 @@ Provide a JSON response with these exact fields:
 
 Return only valid JSON, no markdown."""
 
-        # Build message content — include photo if available
+
+def _parse_ai_json(text: str) -> Optional[AIOfferEstimate]:
+    """Parse JSON from any AI provider's response text into an AIOfferEstimate."""
+    import json, re
+    text = text.strip()
+    m = re.search(r'```(?:json)?\s*\n?(.*?)\n?```', text, re.DOTALL)
+    if m:
+        text = m.group(1).strip()
+    data = json.loads(text)
+    return AIOfferEstimate(
+        suggested_offer=float(data["suggested_offer"]),
+        offer_range_low=float(data["offer_range_low"]),
+        offer_range_high=float(data["offer_range_high"]),
+        confidence=str(data.get("confidence", "medium")),
+        reasoning=str(data.get("reasoning", "")),
+        market_assessment=str(data.get("market_assessment", "")),
+        condition_assessment=str(data.get("condition_assessment", "")),
+        negotiation_tips=[str(t) for t in data.get("negotiation_tips", [])],
+        red_flags=[str(f) for f in data.get("red_flags", [])],
+    )
+
+
+def _ai_anthropic(api_key: str, listing: "Listing", prompt_text: str) -> Optional[AIOfferEstimate]:
+    """Call Claude (Anthropic) for offer analysis with optional vision."""
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=api_key)
         content: list = []
         if listing.photo_url:
             try:
-                content.append({
-                    "type": "image",
-                    "source": {"type": "url", "url": listing.photo_url},
-                })
+                content.append({"type": "image", "source": {"type": "url", "url": listing.photo_url}})
             except Exception:
-                pass  # photo failed, fall back to text-only
-
+                pass
         content.append({"type": "text", "text": prompt_text})
-
         response = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=800,
             messages=[{"role": "user", "content": content}],
         )
-
-        import json
-        import re
-        text = response.content[0].text.strip()
-        m = re.search(r'```(?:json)?\s*\n?(.*?)\n?```', text, re.DOTALL)
-        if m:
-            text = m.group(1).strip()
-        data = json.loads(text)
-
-        return AIOfferEstimate(
-            suggested_offer=float(data["suggested_offer"]),
-            offer_range_low=float(data["offer_range_low"]),
-            offer_range_high=float(data["offer_range_high"]),
-            confidence=str(data.get("confidence", "medium")),
-            reasoning=str(data.get("reasoning", "")),
-            market_assessment=str(data.get("market_assessment", "")),
-            condition_assessment=str(data.get("condition_assessment", "")),
-            negotiation_tips=[str(t) for t in data.get("negotiation_tips", [])],
-            red_flags=[str(f) for f in data.get("red_flags", [])],
-        )
+        return _parse_ai_json(response.content[0].text)
     except Exception as e:
-        print(f"[OfferService] AI estimate failed: {e}")
-        traceback.print_exc()
+        print(f"[OfferService] Anthropic failed: {e}")
         return None
+
+
+def _ai_openai(api_key: str, listing: "Listing", prompt_text: str) -> Optional[AIOfferEstimate]:
+    """Call OpenAI GPT-4o for offer analysis with optional vision."""
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=api_key)
+        user_content: list = []
+        if listing.photo_url:
+            try:
+                user_content.append({"type": "image_url", "image_url": {"url": listing.photo_url, "detail": "low"}})
+            except Exception:
+                pass
+        user_content.append({"type": "text", "text": prompt_text})
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            max_tokens=800,
+            messages=[{"role": "user", "content": user_content}],
+        )
+        return _parse_ai_json(response.choices[0].message.content)
+    except Exception as e:
+        print(f"[OfferService] OpenAI failed: {e}")
+        return None
+
+
+def _ai_google(api_key: str, listing: "Listing", prompt_text: str) -> Optional[AIOfferEstimate]:
+    """Call Google Gemini for offer analysis with optional vision."""
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel("gemini-1.5-pro")
+        parts: list = [prompt_text]
+        if listing.photo_url:
+            try:
+                import requests
+                from io import BytesIO
+                from PIL import Image
+                resp = requests.get(listing.photo_url, timeout=10)
+                parts.insert(0, Image.open(BytesIO(resp.content)))
+            except Exception:
+                pass  # vision unavailable — text-only fallback
+        response = model.generate_content(parts)
+        return _parse_ai_json(response.text)
+    except Exception as e:
+        print(f"[OfferService] Google Gemini failed: {e}")
+        return None
+
+
+def calculate_ai_offer(listing: Listing, comps: list[ComparableSale], logical: Optional[LogicalOffer]) -> Optional[AIOfferEstimate]:
+    """Multi-provider AI offer analysis: Anthropic → OpenAI → Google (first configured wins)."""
+    from homesearch.config import settings
+
+    comp_summary = _build_comp_summary(comps, logical)
+    listing_summary = _build_listing_summary(listing)
+    prompt_text = _build_ai_prompt(listing_summary, comp_summary, logical, bool(listing.photo_url))
+
+    if settings.anthropic_api_key:
+        result = _ai_anthropic(settings.anthropic_api_key, listing, prompt_text)
+        if result:
+            return result
+
+    if settings.openai_api_key:
+        result = _ai_openai(settings.openai_api_key, listing, prompt_text)
+        if result:
+            return result
+
+    if settings.google_api_key:
+        result = _ai_google(settings.google_api_key, listing, prompt_text)
+        if result:
+            return result
+
+    return None
 
 
 # --- Orchestrator ---

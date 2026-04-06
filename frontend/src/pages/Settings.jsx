@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api'
-import { Save, Loader2, CheckCircle, XCircle, FlaskConical, Webhook, Mail, Clock, Copy, Check, Plus, Trash2, Radio, MapPin } from 'lucide-react'
+import { Save, Loader2, CheckCircle, XCircle, FlaskConical, Webhook, Mail, Clock, Copy, Check, Plus, Trash2, Radio, MapPin, Sparkles, ShieldCheck } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 
 function Section({ icon: Icon, title, children }) {
@@ -138,6 +138,11 @@ export default function Settings() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['scheduler'] }),
   })
 
+  const [aiKey, setAiKey] = useState('')
+  const [openaiKey, setOpenaiKey] = useState('')
+  const [googleKey, setGoogleKey] = useState('')
+  const aiKeySet = data?.anthropic_api_key_set ?? false
+
   const [workAddress, setWorkAddress] = useState(data?.work_address ?? '')
   const workGeocoded = !!(data?.work_lat)
 
@@ -185,6 +190,108 @@ export default function Settings() {
           </p>
         )}
       </div>
+
+      {/* AI Offer Analysis */}
+      <Section icon={Sparkles} title="AI Offer Analysis">
+        <p className="text-xs text-ink-muted -mt-1">
+          Powers the CMA narrative, photo condition assessment, and neighborhood context on listing cards.
+          Add one or more provider keys — HomerFindr uses the first configured one.
+        </p>
+        <div className="flex items-center gap-2 text-xs text-ink-muted bg-canvas-800 border border-canvas-700 rounded-lg px-3 py-2">
+          <ShieldCheck size={13} className="text-match-strong shrink-0" />
+          Keys are stored in your local <code className="text-amber-400/80">.env</code> file only — they are never sent to your browser or any third party.
+        </div>
+
+        {/* Anthropic */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-medium text-ink-muted uppercase tracking-widest">Anthropic (Claude)</label>
+            {aiKeySet
+              ? <span className="flex items-center gap-1 text-xs text-match-strong"><CheckCircle size={11} /> Configured</span>
+              : <span className="flex items-center gap-1 text-xs text-ink-muted"><XCircle size={11} /> Not set</span>
+            }
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="password"
+              value={aiKey}
+              onChange={e => setAiKey(e.target.value)}
+              placeholder={aiKeySet ? '••••••••••••••••••••••••' : 'sk-ant-api03-...'}
+              className={inputCls}
+              autoComplete="off"
+            />
+            <Button
+              size="sm"
+              onClick={() => saveMutation.mutate({ anthropic_api_key: aiKey })}
+              disabled={!aiKey || saveMutation.isPending}
+            >
+              {saveMutation.isPending ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+              Save
+            </Button>
+          </div>
+          <p className="text-xs text-ink-muted">Get a key at <span className="text-amber-400/80">console.anthropic.com</span> · Recommended: claude-sonnet-4-6</p>
+        </div>
+
+        {/* OpenAI */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-medium text-ink-muted uppercase tracking-widest">OpenAI (GPT-4o)</label>
+            {data?.openai_api_key_set
+              ? <span className="flex items-center gap-1 text-xs text-match-strong"><CheckCircle size={11} /> Configured</span>
+              : <span className="flex items-center gap-1 text-xs text-ink-muted"><XCircle size={11} /> Not set</span>
+            }
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="password"
+              value={openaiKey}
+              onChange={e => setOpenaiKey(e.target.value)}
+              placeholder={data?.openai_api_key_set ? '••••••••••••••••••••••••' : 'sk-proj-...'}
+              className={inputCls}
+              autoComplete="off"
+            />
+            <Button
+              size="sm"
+              onClick={() => saveMutation.mutate({ openai_api_key: openaiKey })}
+              disabled={!openaiKey || saveMutation.isPending}
+            >
+              {saveMutation.isPending ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+              Save
+            </Button>
+          </div>
+          <p className="text-xs text-ink-muted">Get a key at <span className="text-amber-400/80">platform.openai.com</span> · Supports vision + web browsing</p>
+        </div>
+
+        {/* Google Gemini */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-medium text-ink-muted uppercase tracking-widest">Google Gemini</label>
+            {data?.google_api_key_set
+              ? <span className="flex items-center gap-1 text-xs text-match-strong"><CheckCircle size={11} /> Configured</span>
+              : <span className="flex items-center gap-1 text-xs text-ink-muted"><XCircle size={11} /> Not set</span>
+            }
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="password"
+              value={googleKey}
+              onChange={e => setGoogleKey(e.target.value)}
+              placeholder={data?.google_api_key_set ? '••••••••••••••••••••••••' : 'AIza...'}
+              className={inputCls}
+              autoComplete="off"
+            />
+            <Button
+              size="sm"
+              onClick={() => saveMutation.mutate({ google_api_key: googleKey })}
+              disabled={!googleKey || saveMutation.isPending}
+            >
+              {saveMutation.isPending ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+              Save
+            </Button>
+          </div>
+          <p className="text-xs text-ink-muted">Get a key at <span className="text-amber-400/80">aistudio.google.com</span> · Has Google Search grounding</p>
+        </div>
+      </Section>
 
       {/* Background Monitor */}
       <Section icon={Radio} title="Background Monitor">

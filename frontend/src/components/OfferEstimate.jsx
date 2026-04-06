@@ -226,6 +226,8 @@ export default function OfferEstimate({ listing }) {
 
   function openInCalculator() {
     const params = new URLSearchParams({ price: Math.round(listing.price) })
+    if (listing.hoa_monthly) params.set('hoa', Math.round(listing.hoa_monthly))
+    if (listing.state) params.set('state', listing.state)
     navigate(`/mortgage?${params}`)
   }
 

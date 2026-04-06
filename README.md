@@ -888,6 +888,29 @@ ZAPIER_WEBHOOK_URL=https://hooks.zapier.com/hooks/catch/...
 
 ## 📋 Changelog
 
+### v1.3.0 — 2026-04-05
+
+**New**
+- **Offer estimation**: CMA (Comparable Market Analysis) with recency-weighted comps + optional Claude AI narrative analysis (`ANTHROPIC_API_KEY`)
+- **Full mortgage calculator page** (`/mortgage`): PITI breakdown (Principal, Interest, Tax, Insurance, PMI, HOA), affordability calculator, amortization schedule, rate comparison table
+- **Property tax auto-fill**: mortgage calculator detects state from listing and pre-fills the tax rate using state-level averages (all 50 states + DC); shows computed `~$X/mo · $Y/yr` live as you type
+- **Sold price + ask price display**: sold listings show sold price prominently with original ask price and % diff
+- **AI prompt enrichment**: pool, fireplace, central A/C, and heat type now included in AI offer analysis context
+- Zapier webhook support (`ZAPIER_WEBHOOK_URL`) — new listing alerts to SMS, Slack, or any Zap
+- Background polling (`BACKGROUND_POLLING_ENABLED`, `BACKGROUND_POLL_INTERVAL_MINUTES`, `USER_TIMEZONE`)
+- Household sharing (`HOUSEHOLD_SESSION`) — shared 6-character code for family members to see the same data
+- `WORK_ADDRESS` / `WORK_LAT` / `WORK_LNG` env vars for commute estimation
+
+**Bug Fixes**
+- Comp field names corrected (`parking_garage`, description-based basement/garage, `days_on_mls`) — CMA feature adjustments now work correctly
+- Starred listings no longer grey out when viewed — only unsaved listings fade
+- Agent phone extraction fixed for homeharvest dict format (`{'number': '...'}` was rendering as raw dict string)
+- Browser launch on `serve` command now cross-platform (`webbrowser.open`) — was macOS-only before
+- HOA now included in mortgage calculator total cost calculation
+- Mortgage calculator seeds HOA and state from listing when opened via "Mortgage Calc →" button
+
+---
+
 ### v1.2.0 — 2026-03-26
 
 **New**

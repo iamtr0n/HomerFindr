@@ -229,6 +229,19 @@ function AmortizationTable({ rows }) {
   )
 }
 
+// --- State average effective property tax rates (%) ---
+// Source: Tax Foundation / Census data averages; user can always override.
+const STATE_TAX_RATES = {
+  AL: 0.40, AK: 0.58, AZ: 0.62, AR: 0.63, CA: 0.73, CO: 0.51, CT: 1.79,
+  DE: 0.57, FL: 0.89, GA: 0.92, HI: 0.32, ID: 0.69, IL: 2.23, IN: 0.87,
+  IA: 1.53, KS: 1.41, KY: 0.86, LA: 0.55, ME: 1.36, MD: 1.07, MA: 1.20,
+  MI: 1.54, MN: 1.12, MS: 0.65, MO: 0.97, MT: 0.84, NE: 1.73, NV: 0.48,
+  NH: 2.09, NJ: 2.47, NM: 0.67, NY: 1.73, NC: 0.80, ND: 0.98, OH: 1.59,
+  OK: 0.90, OR: 0.91, PA: 1.58, RI: 1.53, SC: 0.57, SD: 1.17, TN: 0.66,
+  TX: 1.60, UT: 0.56, VT: 1.78, VA: 0.87, WA: 0.93, WV: 0.57, WI: 1.73,
+  WY: 0.61, DC: 0.55,
+}
+
 // --- Main page ---
 
 const TABS = [
@@ -241,17 +254,20 @@ export default function MortgageCalculator() {
   const { settings: globalSettings } = useMortgage()
   const [searchParams] = useSearchParams()
 
-  // Seed home price from ?price= param (set by "Mortgage Calc →" on listing cards)
+  // Seed from URL params (set by "Mortgage Calc →" on listing cards)
   const seedPrice = parseInt(searchParams.get('price') || '0', 10) || 400000
+  const seedHoa   = parseFloat(searchParams.get('hoa') || '0') || 0
+  const seedState = (searchParams.get('state') || '').toUpperCase().trim()
+  const stateTaxRate = seedState ? (STATE_TAX_RATES[seedState] ?? null) : null
 
   // Loan inputs — seed from URL param or global mortgage bar settings
   const [homePrice, setHomePrice] = useState(seedPrice)
   const [downAmt, setDownAmt] = useState(() => Math.round(seedPrice * ((globalSettings.downPct || 20) / 100)))
   const [rate, setRate] = useState(globalSettings.rate || 7.0)
   const [termYears, setTermYears] = useState(globalSettings.termYears || 30)
-  const [propTaxRate, setPropTaxRate] = useState(1.2)   // % of home price annually
+  const [propTaxRate, setPropTaxRate] = useState(stateTaxRate ?? 1.2)
   const [insuranceAnnual, setInsuranceAnnual] = useState(1500)
-  const [hoaMonthly, setHoaMonthly] = useState(0)
+  const [hoaMonthly, setHoaMonthly] = useState(seedHoa)
   const [pmiRate, setPmiRate] = useState(0.5)           // % of loan annually
 
   const [tab, setTab] = useState('calculator')
@@ -272,7 +288,12 @@ export default function MortgageCalculator() {
   ), [loanAmount, rate, termYears])
 
   const totalInterest = amortRows.reduce((s, r) => s + r.totalInterest, 0)
-  const totalCost = loanAmount + totalInterest + (monthlyTax + monthlyInsurance) * termYears * 12
+  const totalCost = loanAmount + totalInterest + (monthlyTax + monthlyInsurance + (hoaMonthly || 0)) * termYears * 12
+
+  // Dynamic hint for the property tax field
+  const taxHint = homePrice > 0
+    ? `~${fmt(monthlyTax)}/mo · ${fmt(monthlyTax * 12)}/yr${stateTaxRate != null ? ` · ${seedState} avg` : ''}`
+    : stateTaxRate != null ? `${seedState} state avg · check county assessor for exact rate` : 'US avg ~1.1%; check county records'
 
   const breakdownItems = [
     { label: 'Principal & Interest', amount: monthlyPI, color: '#f59e0b' },
@@ -367,7 +388,7 @@ export default function MortgageCalculator() {
 
           <div className="border-t border-canvas-700 pt-4 space-y-3">
             <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Additional Costs</p>
-            <NumberInput label="Property tax rate" value={propTaxRate} onChange={setPropTaxRate} suffix="% / yr" step={0.1} min={0} hint="US avg ~1.1%; check county records" />
+            <NumberInput label="Property tax rate" value={propTaxRate} onChange={setPropTaxRate} suffix="% / yr" step={0.1} min={0} hint={taxHint} />
             <NumberInput label="Home insurance" value={insuranceAnnual} onChange={setInsuranceAnnual} prefix="$" suffix="/ yr" step={100} min={0} />
             <NumberInput label="HOA" value={hoaMonthly || ''} onChange={setHoaMonthly} prefix="$" suffix="/ mo" step={25} min={0} />
             {hasPMI && (
@@ -403,7 +424,7 @@ export default function MortgageCalculator() {
                     { label: 'Down payment', value: downAmt, sub: `(${downPct.toFixed(1)}%)` },
                     { label: 'Total interest paid', value: totalInterest, cls: 'text-red-400/80' },
                     { label: `Total P&I over ${termYears} yrs`, value: loanAmount + totalInterest },
-                    { label: 'Est. total cost (incl. taxes + insurance)', value: totalCost, cls: 'text-amber-400 font-semibold' },
+                    { label: `Est. total cost (incl. taxes, insurance${hoaMonthly > 0 ? ' + HOA' : ''})`, value: totalCost, cls: 'text-amber-400 font-semibold' },
                   ].map(row => (
                     <div key={row.label} className="flex justify-between items-baseline text-sm">
                       <span className="text-ink-muted">{row.label} {row.sub && <span className="text-xs">{row.sub}</span>}</span>

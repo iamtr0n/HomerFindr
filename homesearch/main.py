@@ -226,9 +226,8 @@ def serve():
     if open_browser:
         def _open():
             time.sleep(1.5)
-            import subprocess, platform
-            if platform.system() == "Darwin":
-                subprocess.run(["open", url], capture_output=True)
+            import webbrowser
+            webbrowser.open(url)
         threading.Thread(target=_open, daemon=True).start()
 
     uvicorn.run(

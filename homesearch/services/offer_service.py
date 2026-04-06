@@ -123,6 +123,12 @@ def _fetch_from_location(location: str, listing: Listing, past_days: int) -> lis
                     except Exception:
                         pass
 
+                # Garage: homeharvest column is parking_garage; fall back to description
+                desc_lower = str(row.get("description") or row.get("text") or "").lower()
+                _pg = row.get("parking_garage")
+                has_garage = True if (_pg and str(_pg).lower() not in ("false", "0", "none", "nan")) or "garage" in desc_lower else None
+                has_basement = True if "basement" in desc_lower else None
+
                 comp = ComparableSale(
                     address=str(row.get("street") or row.get("address") or ""),
                     price=price,
@@ -133,9 +139,9 @@ def _fetch_from_location(location: str, listing: Listing, past_days: int) -> lis
                     bedrooms=row_beds,
                     bathrooms=row_baths,
                     year_built=_safe_int(row.get("year_built")),
-                    has_garage=_safe_bool(row.get("garage")),
-                    has_basement=_safe_bool(row.get("basement")),
-                    days_on_mls=_safe_int(row.get("days_on_market") or row.get("dom")),
+                    has_garage=has_garage,
+                    has_basement=has_basement,
+                    days_on_mls=_safe_int(row.get("days_on_mls") or row.get("days_on_market") or row.get("dom")),
                     days_since_sold=days_since,
                     zip_code=str(row.get("zip_code") or ""),
                     recency_weight=weight,

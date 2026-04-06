@@ -8,6 +8,7 @@ import SearchResults from './pages/SearchResults'
 import Settings from './pages/Settings'
 import MapView from './pages/MapView'
 import MortgageCalculator from './pages/MortgageCalculator'
+import Comps from './pages/Comps'
 import { api } from './api'
 import MortgageBar, { MortgageProvider } from './components/MortgageBar'
 
@@ -120,6 +121,7 @@ export default function App() {
               <Route path="/settings" element={<Settings />} />
               <Route path="/map" element={<MapView />} />
               <Route path="/mortgage" element={<MortgageCalculator />} />
+              <Route path="/comps/:listingId" element={<Comps />} />
             </Routes>
           </main>
         </div>

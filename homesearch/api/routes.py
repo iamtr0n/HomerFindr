@@ -807,6 +807,17 @@ def get_offer_estimate(listing: Listing):
     return result.model_dump()
 
 
+@app.get("/api/listings/{listing_id}/comps")
+def get_listing_comps(listing_id: int):
+    """Fetch recently sold comparable listings for a saved listing."""
+    listing = db.get_listing_by_id(listing_id)
+    if not listing:
+        raise HTTPException(404, "Listing not found")
+    from homesearch.services.offer_service import get_comparable_listings
+    comps = get_comparable_listings(listing)
+    return {"comps": [c.model_dump() for c in comps], "total": len(comps)}
+
+
 # --- Polygon → zip codes endpoint ---
 
 @app.post("/api/zips/from-polygon")

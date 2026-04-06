@@ -17,6 +17,98 @@ from homesearch.models import (
 )
 
 
+# --- Comparable listings (recently sold, for the comps page) ---
+
+def get_comparable_listings(listing: Listing, radius_miles: float = 1.5, days_back: int = 180) -> list:
+    """Fetch recently sold comparable properties using homeharvest.
+
+    Returns a list of Listing model instances normalized via the same logic
+    as HomeHarvestProvider.
+    """
+    try:
+        from homeharvest import scrape_property
+        from homesearch.models import Listing as ListingModel
+
+        location = listing.zip_code if listing.zip_code else f"{listing.city}, {listing.state}"
+        if not location.strip():
+            return []
+
+        try:
+            df = scrape_property(location=location, listing_type="sold", past_days=days_back, radius=radius_miles)
+        except TypeError:
+            # homeharvest version doesn't support radius param
+            df = scrape_property(location=location, listing_type="sold", past_days=days_back)
+
+        if df is None or df.empty:
+            return []
+
+        results: list[Listing] = []
+        for _, row in df.iterrows():
+            try:
+                sold_price = _safe_float(row.get("sold_price"))
+                list_price = _safe_float(row.get("list_price") or row.get("price"))
+                price = sold_price or list_price
+                if not price or price <= 0:
+                    continue
+
+                beds = _safe_int(row.get("beds") or row.get("bedrooms"))
+                baths = _safe_float(row.get("full_baths") or row.get("baths") or row.get("bathrooms"))
+                sqft = _safe_int(row.get("sqft") or row.get("square_feet"))
+
+                # Bedroom filter: within 1 of target
+                if listing.bedrooms and beds and abs(beds - listing.bedrooms) > 1:
+                    continue
+
+                # Sqft filter: within 30% of target
+                if listing.sqft and sqft:
+                    ratio = sqft / listing.sqft
+                    if ratio < 0.70 or ratio > 1.30:
+                        continue
+
+                street = str(row.get("street") or row.get("address") or "")
+                city = str(row.get("city") or listing.city or "")
+                state = str(row.get("state") or listing.state or "")
+                zip_code = str(row.get("zip_code") or "")
+                source_id = str(row.get("mls_id") or row.get("property_url") or f"comp-{street}-{zip_code}")
+
+                desc_lower = str(row.get("description") or row.get("text") or "").lower()
+                _pg = row.get("parking_garage")
+                has_garage = True if (_pg and str(_pg).lower() not in ("false", "0", "none", "nan")) or "garage" in desc_lower else None
+                has_basement = True if "basement" in desc_lower else None
+
+                comp_listing = ListingModel(
+                    source="homeharvest_comp",
+                    source_id=source_id,
+                    address=street,
+                    city=city,
+                    state=state,
+                    zip_code=zip_code,
+                    price=price,
+                    listing_type="sold",
+                    property_type=str(row.get("style") or row.get("property_type") or "single_family"),
+                    bedrooms=beds,
+                    bathrooms=baths,
+                    sqft=sqft,
+                    lot_sqft=_safe_int(row.get("lot_sqft") or row.get("lot_square_feet")),
+                    year_built=_safe_int(row.get("year_built")),
+                    has_garage=has_garage,
+                    has_basement=has_basement,
+                    latitude=_safe_float(row.get("latitude") or row.get("lat")),
+                    longitude=_safe_float(row.get("longitude") or row.get("lng") or row.get("lon")),
+                    photo_url=str(row.get("primary_photo") or row.get("photo_url") or ""),
+                    source_url=str(row.get("property_url") or ""),
+                )
+                results.append(comp_listing)
+            except Exception:
+                continue
+
+        return results[:10]
+
+    except Exception:
+        traceback.print_exc()
+        return []
+
+
 # --- Comp fetching ---
 
 def fetch_comps(listing: Listing, past_days: int = 365) -> list[ComparableSale]:
@@ -289,8 +381,21 @@ def calculate_logical_offer(listing: Listing, comps: list[ComparableSale]) -> Op
 
 # --- AI estimate with photo analysis ---
 
-def _build_ai_prompt(listing_summary: str, comp_summary: str, logical: Optional["LogicalOffer"], has_photo: bool) -> str:
+def _build_ai_prompt(listing_summary: str, comp_summary: str, logical: Optional["LogicalOffer"], has_photo: bool, comps: Optional[list] = None) -> str:
     """Build the shared prompt text used by all AI providers."""
+    comps_section = ""
+    if comps:
+        lines = ["RECENT COMPARABLE SALES:"]
+        for c in comps[:8]:
+            price_str = f"${c.price:,.0f}" if c.price else "N/A"
+            sqft_str = f"{c.sqft:,} sqft" if c.sqft else ""
+            ppsf_str = f"${c.price/c.sqft:.0f}/sqft" if c.price and c.sqft else ""
+            beds_baths = f"{c.bedrooms}bd/{c.bathrooms}ba" if c.bedrooms and c.bathrooms else ""
+            addr = c.address or "Unknown"
+            detail = ", ".join(p for p in [price_str, sqft_str, ppsf_str, beds_baths] if p)
+            lines.append(f"  • {addr}: {detail}")
+        comps_section = "\n".join(lines)
+
     return f"""You are an expert real estate analyst helping a buyer decide how much to offer on a home.
 
 LISTING DETAILS:
@@ -299,9 +404,13 @@ LISTING DETAILS:
 COMPARABLE SOLD HOMES (last 12 months, nearby, weighted by recency):
 {comp_summary}
 
+{comps_section}
+
 {_market_context(logical)}
 
 {"PHOTO ANALYSIS: Review the listing photo and assess visible condition, style era, and whether the home appears recently renovated. Factor this into your recommendation." if has_photo else ""}
+
+IMPORTANT: In competitive markets, final sale prices routinely exceed asking price. Your estimate should reflect realistic market value, not a conservative floor. If recent comps show a hot market, factor that in.
 
 Provide a JSON response with these exact fields:
 {{
@@ -413,9 +522,10 @@ def calculate_ai_offer(listing: Listing, comps: list[ComparableSale], logical: O
     """Multi-provider AI offer analysis: Anthropic → OpenAI → Google (first configured wins)."""
     from homesearch.config import settings
 
+    comparable_listings = get_comparable_listings(listing)
     comp_summary = _build_comp_summary(comps, logical)
     listing_summary = _build_listing_summary(listing)
-    prompt_text = _build_ai_prompt(listing_summary, comp_summary, logical, bool(listing.photo_url))
+    prompt_text = _build_ai_prompt(listing_summary, comp_summary, logical, bool(listing.photo_url), comps=comparable_listings)
 
     if settings.anthropic_api_key:
         result = _ai_anthropic(settings.anthropic_api_key, listing, prompt_text)

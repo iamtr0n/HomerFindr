@@ -563,6 +563,20 @@ def toggle_listing_starred(listing_id: int, session_id: str = "default") -> bool
         conn.close()
 
 
+def get_listing_by_id(listing_id: int) -> Optional[Listing]:
+    """Fetch a single listing by its database primary key."""
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            "SELECT * FROM listings WHERE id = ?", (listing_id,)
+        ).fetchone()
+        if not row:
+            return None
+        return _row_to_listing(row)
+    finally:
+        conn.close()
+
+
 def get_all_listings() -> list[Listing]:
     """Return all listings across every search, deduplicated, newest first.
 

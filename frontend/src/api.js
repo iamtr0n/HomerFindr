@@ -129,6 +129,9 @@ export const api = {
     body: JSON.stringify(listing),
   }),
 
+  // Comparable sales
+  getComps: (id) => request(`/listings/${id}/comps`),
+
   // Dismissed listings (server-side sync)
   getDismissed: () => request('/listings/dismissed'),
   dismissListing: (sourceId) => request(`/listings/${encodeURIComponent(sourceId)}/dismiss`, { method: 'POST' }),

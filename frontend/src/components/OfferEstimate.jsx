@@ -250,6 +250,14 @@ export default function OfferEstimate({ listing }) {
             Mortgage Calc <ArrowRight size={11} />
           </button>
         )}
+        {listing.id && (
+          <button
+            onClick={() => navigate(`/comps/${listing.id}`)}
+            className="flex items-center gap-1.5 text-xs font-medium text-sky-400/80 hover:text-sky-400 transition-colors py-1"
+          >
+            View Comps <ArrowRight size={11} />
+          </button>
+        )}
       </div>
 
       {open && (

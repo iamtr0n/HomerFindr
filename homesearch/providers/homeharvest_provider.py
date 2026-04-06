@@ -133,8 +133,11 @@ class HomeHarvestProvider(BaseProvider):
             source_url = str(property_url) if property_url else ""
             source_id = str(mls_id) if mls_id else source_url or address
 
-            # Property details
-            price = _safe_float(_coalesce(row.get("list_price"), row.get("price"), row.get("sold_price")))
+            # Property details — for sold listings prefer sold_price as price, keep list_price separate
+            raw_sold = _safe_float(row.get("sold_price"))
+            raw_list = _safe_float(row.get("list_price") or row.get("price"))
+            price = raw_sold or raw_list
+            list_price_val = raw_list if raw_sold and raw_list and raw_list != raw_sold else None
             beds = _safe_int(_coalesce(row.get("beds"), row.get("bedrooms")))
             baths = _safe_float(_coalesce(row.get("baths"), row.get("bathrooms"), row.get("full_baths")))
             sqft = _safe_int(_coalesce(row.get("sqft"), row.get("square_feet")))
@@ -262,6 +265,7 @@ class HomeHarvestProvider(BaseProvider):
                 state=state,
                 zip_code=zip_code,
                 price=price,
+                list_price=list_price_val,
                 listing_type=lt,
                 property_type=property_type,
                 bedrooms=beds,

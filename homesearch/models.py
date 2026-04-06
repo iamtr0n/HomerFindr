@@ -86,6 +86,7 @@ class Listing(BaseModel):
     state: str = ""
     zip_code: str = ""
     price: Optional[float] = None
+    list_price: Optional[float] = None  # original ask price (populated for sold listings)
     listing_type: str = "sale"
     property_type: str = "single_family"
     bedrooms: Optional[int] = None

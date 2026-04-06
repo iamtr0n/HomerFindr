@@ -62,7 +62,7 @@ function writeDismissed(set) {
 
 export default function PropertyCard({ listing, isGoldStar = false, isViewed = false, maxScore = 5, onToggleStar, mortgageSettings, onDismiss, commuteMinutes }) {
   const {
-    id: listingId, address, city, state, price, bedrooms, bathrooms, sqft, year_built,
+    id: listingId, address, city, state, price, list_price, bedrooms, bathrooms, sqft, year_built,
     has_garage, has_basement, stories, hoa_monthly, photo_url, source_url,
     source, zip_code, property_type, match_badges, near_highway, highway_name,
     school_rating, listing_type, match_score, days_on_mls, source_id, is_starred,
@@ -220,7 +220,26 @@ export default function PropertyCard({ listing, isGoldStar = false, isViewed = f
 
         {/* Price row */}
         <div className="flex items-center gap-2 mb-1 flex-wrap">
-          <p className="font-serif text-2xl text-ink-primary">{priceStr}</p>
+          <div className="flex flex-col">
+            <div className="flex items-center gap-2">
+              <p className="font-serif text-2xl text-ink-primary">
+                {listing_type === 'sold' && price ? `$${price.toLocaleString()}` : priceStr}
+              </p>
+              {listing_type === 'sold' && price && (
+                <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-canvas-700 text-ink-muted">SOLD</span>
+              )}
+            </div>
+            {listing_type === 'sold' && list_price && (
+              <p className="text-xs text-ink-muted mt-0.5">
+                Asked <span className="font-mono">${list_price.toLocaleString()}</span>
+                {price && list_price && (
+                  <span className={`ml-1.5 font-medium ${price > list_price ? 'text-red-400' : 'text-green-400'}`}>
+                    ({price > list_price ? '+' : ''}{Math.round((price - list_price) / list_price * 100)}% {price > list_price ? 'over' : 'under'} ask)
+                  </span>
+                )}
+              </p>
+            )}
+          </div>
           {match_score != null && match_score > 0 && (
             <MatchDots score={match_score} maxScore={maxScore} />
           )}

@@ -208,6 +208,16 @@ def update_search(search_id: int, req: SearchRequest):
     return {"status": "updated"}
 
 
+@app.patch("/api/searches/{search_id}/active")
+def toggle_search_active(search_id: int, body: dict):
+    """Enable or disable a saved search (sets is_active)."""
+    existing = db.get_saved_search(search_id)
+    if not existing:
+        raise HTTPException(404, "Search not found")
+    db.update_search(search_id, is_active=bool(body.get("is_active", True)))
+    return {"status": "updated"}
+
+
 @app.delete("/api/searches/{search_id}")
 def delete_search(search_id: int):
     """Delete a saved search."""

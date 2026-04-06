@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { useMemo, useState, useEffect, useCallback } from 'react'
 import { api, getSessionId, setSessionId } from '../api'
-import { Play, Trash2, Clock, MapPin, DollarSign, Loader2, Home, Bell, BellOff, Save, Bookmark, Settings2, X, Plus, QrCode, ChevronDown, ChevronUp, Pencil } from 'lucide-react'
+import { Play, Trash2, Clock, MapPin, DollarSign, Loader2, Home, Bell, BellOff, Save, Bookmark, Settings2, X, Plus, QrCode, ChevronDown, ChevronUp, Pencil, Power } from 'lucide-react'
 import { estimateCommute } from '../utils/commute'
 import { QRCodeSVG } from 'qrcode.react'
 import { Badge } from '../components/ui/Badge'
@@ -118,7 +118,6 @@ export default function Dashboard() {
   }, [queryClient])
 
   // QR connect
-  const [showQr, setShowQr] = useState(false)
   const networkQuery = useQuery({ queryKey: ['network-info'], queryFn: api.getNetworkInfo, staleTime: Infinity })
   const appUrl = networkQuery.data?.url || window.location.origin
 
@@ -169,20 +168,31 @@ export default function Dashboard() {
 
   const starMutation = useMutation({
     mutationFn: (id) => api.toggleStarred(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['starred'] }),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ['starred'] })
+      const previous = queryClient.getQueryData(['starred'])
+      // Optimistically remove unstarred listing so counter drops instantly
+      queryClient.setQueryData(['starred'], (old) => {
+        if (!old?.listings) return old
+        const isCurrentlyStarred = old.listings.some(l => l.id === id)
+        if (isCurrentlyStarred) return { ...old, listings: old.listings.filter(l => l.id !== id) }
+        return old  // starring: can't optimistically add without full listing data
+      })
+      return { previous }
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous) queryClient.setQueryData(['starred'], context.previous)
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['starred'] }),
   })
 
   const [alertsOpen, setAlertsOpen] = useState(null)
   const [alertForm, setAlertForm] = useState({ desktop: true, zapier_webhook: '', notify_coming_soon_only: false, alerts_paused: false, recipients: [] })
   const [recipientInput, setRecipientInput] = useState('')
 
-  const [showSearches, setShowSearches] = useState(true)
+  const [showSearches, setShowSearches] = useState(false)
+  const [showConnect,  setShowConnect]  = useState(false)
   const [showDismissed, setShowDismissed] = useState(false)
-  useEffect(() => {
-    const handleScroll = () => { if (window.scrollY > 120) setShowSearches(false) }
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
 
   const notifMutation = useMutation({
     mutationFn: ({ id, settings }) => api.updateNotifications(id, settings),
@@ -194,6 +204,10 @@ export default function Dashboard() {
   })
   const deleteMutation = useMutation({
     mutationFn: (id) => api.deleteSearch(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['searches'] }),
+  })
+  const toggleActiveMutation = useMutation({
+    mutationFn: ({ id, is_active }) => api.setSearchActive(id, is_active),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['searches'] }),
   })
   const updateMutation = useMutation({
@@ -320,79 +334,6 @@ export default function Dashboard() {
           )
         })()}
 
-        {/* Push Notifications toggle */}
-        {'serviceWorker' in navigator && 'PushManager' in window && (
-          <div className="flex items-center justify-between bg-canvas-900 border border-canvas-700 rounded-xl px-4 py-3 mb-6">
-            <div className="flex items-center gap-3">
-              {pushEnabled ? <Bell size={16} className="text-amber-400" /> : <BellOff size={16} className="text-ink-muted" />}
-              <div>
-                <p className="text-sm font-medium text-ink-primary">Phone &amp; Browser Notifications</p>
-                <p className="text-xs text-ink-muted">{pushEnabled ? 'You\'ll get a lock-screen alert when new listings are found.' : 'Get alerts on this device when new listings are found.'}</p>
-              </div>
-            </div>
-            <button
-              onClick={togglePush}
-              disabled={pushLoading}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${pushEnabled ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40 hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/40' : 'bg-canvas-800 text-ink-secondary border border-canvas-600 hover:border-amber-500 hover:text-amber-400'}`}
-            >
-              {pushLoading ? <Loader2 size={12} className="animate-spin" /> : pushEnabled ? 'Disable' : 'Enable'}
-            </button>
-          </div>
-        )}
-
-        {/* Connect another device via QR */}
-        <div className="bg-canvas-900 border border-canvas-700 rounded-xl px-4 py-3 mb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <QrCode size={16} className="text-ink-muted" />
-              <div>
-                <p className="text-sm font-medium text-ink-primary">Connect Another Device</p>
-                <p className="text-xs text-ink-muted font-mono">
-                  {appUrl}
-                  {sessionCode && <span className="text-amber-400/80"> · Session {sessionCode}</span>}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setShowQr(v => !v)}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-canvas-800 text-ink-secondary border border-canvas-600 hover:border-amber-500 hover:text-amber-400 transition-colors"
-            >
-              {showQr ? 'Hide' : 'Show QR'}
-            </button>
-          </div>
-          {showQr && (
-            <div className="mt-4 flex flex-col items-center gap-3">
-              <div className="p-3 bg-white rounded-xl">
-                <QRCodeSVG value={sessionCode ? `${appUrl}?s=${sessionCode}` : appUrl} size={180} />
-              </div>
-              <p className="text-sm font-mono tracking-[0.3em] text-amber-400 font-bold">{sessionCode}</p>
-              <p className="text-xs text-ink-muted text-center max-w-xs">Scan QR or enter the code above on another device — dismissed houses and saved searches transfer instantly.</p>
-
-              {/* Manual code entry */}
-              <div className="w-full max-w-xs mt-1">
-                <p className="text-xs text-ink-muted mb-1.5 text-center">Or enter someone else's session code:</p>
-                <div className="flex gap-2">
-                  <input
-                    value={manualCode}
-                    onChange={(e) => { setManualCode(e.target.value.toUpperCase().slice(0, 6)); setSessionError('') }}
-                    onKeyDown={(e) => e.key === 'Enter' && applySessionCode(manualCode)}
-                    placeholder="XXXXXX"
-                    maxLength={6}
-                    className="flex-1 px-3 py-1.5 text-sm font-mono tracking-widest text-center bg-canvas-800 border border-canvas-600 rounded-lg text-ink-primary placeholder:text-ink-muted focus:outline-none focus:border-amber-500 uppercase"
-                  />
-                  <button
-                    onClick={() => applySessionCode(manualCode)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/20 text-amber-400 border border-amber-500/40 hover:bg-amber-500/30 transition-colors"
-                  >
-                    Join
-                  </button>
-                </div>
-                {sessionError && <p className="text-xs text-red-400 mt-1 text-center">{sessionError}</p>}
-              </div>
-            </div>
-          )}
-        </div>
-
         {/* Saved Searches */}
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-sans text-lg font-semibold text-ink-primary">Saved Searches</h2>
@@ -514,6 +455,13 @@ export default function Dashboard() {
                     className="p-2 rounded-lg border border-canvas-600 hover:border-canvas-500 transition-colors"
                   >
                     <Settings2 size={15} className="text-ink-muted" />
+                  </button>
+                  <button
+                    title={s.is_active ? 'Disable search (stop auto-polling)' : 'Enable search (resume auto-polling)'}
+                    onClick={() => toggleActiveMutation.mutate({ id: s.id, is_active: !s.is_active })}
+                    className={`p-2 rounded-lg border transition-colors ${s.is_active ? 'border-canvas-600 text-ink-muted hover:border-canvas-500 hover:text-ink-base' : 'border-match-strong/40 text-match-strong bg-match-strong/10 hover:bg-match-strong/20'}`}
+                  >
+                    <Power size={14} />
                   </button>
                   <button
                     onClick={() => { if (confirm(`Delete "${s.name}"?`)) deleteMutation.mutate(s.id) }}
@@ -732,6 +680,82 @@ export default function Dashboard() {
             )}
           </div>
         )}
+        {/* ── Management strip (collapsed by default) ─────────── */}
+        <div className="mt-10 space-y-3 border-t border-canvas-800 pt-6">
+
+          {/* Push Notifications */}
+          {'serviceWorker' in navigator && 'PushManager' in window && (
+            <div className="flex items-center justify-between bg-canvas-900 border border-canvas-700 rounded-xl px-4 py-3">
+              <div className="flex items-center gap-3">
+                {pushEnabled ? <Bell size={15} className="text-amber-400" /> : <BellOff size={15} className="text-ink-muted" />}
+                <div>
+                  <p className="text-sm font-medium text-ink-primary">Phone &amp; Browser Notifications</p>
+                  <p className="text-xs text-ink-muted">{pushEnabled ? "Lock-screen alerts enabled on this device." : "Get alerts when new listings are found."}</p>
+                </div>
+              </div>
+              <button
+                onClick={togglePush}
+                disabled={pushLoading}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${pushEnabled ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40 hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/40' : 'bg-canvas-800 text-ink-secondary border border-canvas-600 hover:border-amber-500 hover:text-amber-400'}`}
+              >
+                {pushLoading ? <Loader2 size={12} className="animate-spin" /> : pushEnabled ? 'Disable' : 'Enable'}
+              </button>
+            </div>
+          )}
+
+          {/* Connect Another Device — collapsible */}
+          <div className="bg-canvas-900 border border-canvas-700 rounded-xl px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <QrCode size={15} className="text-ink-muted" />
+                <div>
+                  <p className="text-sm font-medium text-ink-primary">Connect Another Device</p>
+                  <p className="text-xs text-ink-muted font-mono">
+                    {appUrl}
+                    {sessionCode && <span className="text-amber-400/80"> · Session {sessionCode}</span>}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowConnect(v => !v)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-canvas-800 text-ink-secondary border border-canvas-600 hover:border-amber-500 hover:text-amber-400 transition-colors"
+              >
+                {showConnect ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                {showConnect ? 'Hide' : 'Show QR'}
+              </button>
+            </div>
+            {showConnect && (
+              <div className="mt-4 flex flex-col items-center gap-3">
+                <div className="p-3 bg-white rounded-xl">
+                  <QRCodeSVG value={sessionCode ? `${appUrl}?s=${sessionCode}` : appUrl} size={180} />
+                </div>
+                <p className="text-sm font-mono tracking-[0.3em] text-amber-400 font-bold">{sessionCode}</p>
+                <p className="text-xs text-ink-muted text-center max-w-xs">Scan QR or enter the code above on another device — dismissed houses and saved searches transfer instantly.</p>
+                <div className="w-full max-w-xs mt-1">
+                  <p className="text-xs text-ink-muted mb-1.5 text-center">Or enter someone else's session code:</p>
+                  <div className="flex gap-2">
+                    <input
+                      value={manualCode}
+                      onChange={(e) => { setManualCode(e.target.value.toUpperCase().slice(0, 6)); setSessionError('') }}
+                      onKeyDown={(e) => e.key === 'Enter' && applySessionCode(manualCode)}
+                      placeholder="XXXXXX"
+                      maxLength={6}
+                      className="flex-1 px-3 py-1.5 text-sm font-mono tracking-widest text-center bg-canvas-800 border border-canvas-600 rounded-lg text-ink-primary placeholder:text-ink-muted focus:outline-none focus:border-amber-500 uppercase"
+                    />
+                    <button
+                      onClick={() => applySessionCode(manualCode)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/20 text-amber-400 border border-amber-500/40 hover:bg-amber-500/30 transition-colors"
+                    >
+                      Join
+                    </button>
+                  </div>
+                  {sessionError && <p className="text-xs text-red-400 mt-1 text-center">{sessionError}</p>}
+                </div>
+              </div>
+            )}
+          </div>
+
+        </div>
       </>
       )}
 

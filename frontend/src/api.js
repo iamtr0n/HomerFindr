@@ -63,6 +63,10 @@ export const api = {
     body: JSON.stringify({ criteria, save_as: name }),
   }),
   deleteSearch: (id) => request(`/searches/${id}`, { method: 'DELETE' }),
+  setSearchActive: (id, is_active) => request(`/searches/${id}/active`, {
+    method: 'PATCH',
+    body: JSON.stringify({ is_active }),
+  }),
   getResults: (id, newOnly = false) => request(`/searches/${id}/results?new_only=${newOnly}`),
   markSeen: (id) => request(`/searches/${id}/mark-seen`, { method: 'POST' }),
   // FIX-01: verified — paths match, no double /api prefix

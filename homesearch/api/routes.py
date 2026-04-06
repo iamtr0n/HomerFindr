@@ -621,9 +621,10 @@ def search_locations(q: str = ""):
 # --- Listing actions ---
 
 @app.post("/api/listings/{listing_id}/starred")
-def toggle_starred(listing_id: int):
-    """Toggle the saved/starred state of a listing."""
-    new_state = db.toggle_listing_starred(listing_id)
+def toggle_starred(listing_id: int, request: Request):
+    """Toggle the saved/starred state of a listing for the current session."""
+    session_id = _get_session(request)
+    new_state = db.toggle_listing_starred(listing_id, session_id)
     return {"is_starred": new_state}
 
 

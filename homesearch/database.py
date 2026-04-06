@@ -108,6 +108,14 @@ CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS starred_listings (
+    listing_id INTEGER NOT NULL,
+    session_id TEXT NOT NULL DEFAULT 'default',
+    starred_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (listing_id, session_id),
+    FOREIGN KEY (listing_id) REFERENCES listings(id) ON DELETE CASCADE
+);
 """
 
 
@@ -190,6 +198,18 @@ def init_db():
         conn.commit()
     except Exception:
         pass
+    # Migrate legacy is_starred=1 rows into the starred_listings join table
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS starred_listings (
+            listing_id INTEGER NOT NULL,
+            session_id TEXT NOT NULL DEFAULT 'default',
+            starred_at TEXT NOT NULL DEFAULT (datetime('now')),
+            PRIMARY KEY (listing_id, session_id),
+            FOREIGN KEY (listing_id) REFERENCES listings(id) ON DELETE CASCADE
+        );
+        INSERT OR IGNORE INTO starred_listings (listing_id, session_id)
+            SELECT id, 'default' FROM listings WHERE is_starred = 1;
+    """)
     conn.commit()
     conn.close()
 
@@ -517,14 +537,28 @@ def mark_listing_starred(listing_id: int) -> None:
         conn.close()
 
 
-def toggle_listing_starred(listing_id: int) -> bool:
-    """Toggle the starred/saved state of a listing. Returns the new state."""
+def toggle_listing_starred(listing_id: int, session_id: str = "default") -> bool:
+    """Toggle the starred/saved state of a listing for a session. Returns the new state."""
     conn = get_connection()
     try:
-        conn.execute("UPDATE listings SET is_starred = 1 - is_starred WHERE id = ?", (listing_id,))
-        conn.commit()
-        row = conn.execute("SELECT is_starred FROM listings WHERE id = ?", (listing_id,)).fetchone()
-        return bool(row["is_starred"]) if row else False
+        exists = conn.execute(
+            "SELECT 1 FROM starred_listings WHERE listing_id = ? AND session_id = ?",
+            (listing_id, session_id),
+        ).fetchone()
+        if exists:
+            conn.execute(
+                "DELETE FROM starred_listings WHERE listing_id = ? AND session_id = ?",
+                (listing_id, session_id),
+            )
+            conn.commit()
+            return False
+        else:
+            conn.execute(
+                "INSERT OR IGNORE INTO starred_listings (listing_id, session_id) VALUES (?, ?)",
+                (listing_id, session_id),
+            )
+            conn.commit()
+            return True
     finally:
         conn.close()
 
@@ -551,17 +585,18 @@ def get_all_listings() -> list[Listing]:
 
 
 def get_starred_listings(session_id: str = "default") -> list[Listing]:
-    """Return user-saved listings for a session, most recently seen first."""
+    """Return user-saved listings for a session, most recently starred first."""
     conn = get_connection()
     try:
         rows = conn.execute(
             """
-            SELECT l.*, MAX(sr.is_new) AS is_new FROM listings l
-            JOIN search_results sr ON l.id = sr.listing_id
-            JOIN saved_searches ss ON sr.search_id = ss.id
-            WHERE l.is_starred = 1 AND ss.session_id = ?
+            SELECT l.*, sl.starred_at,
+                   COALESCE(MAX(sr.is_new), 0) AS is_new
+            FROM listings l
+            JOIN starred_listings sl ON l.id = sl.listing_id AND sl.session_id = ?
+            LEFT JOIN search_results sr ON l.id = sr.listing_id
             GROUP BY l.id
-            ORDER BY l.last_seen_at DESC
+            ORDER BY sl.starred_at DESC
             """,
             (session_id,),
         ).fetchall()

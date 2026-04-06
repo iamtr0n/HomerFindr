@@ -136,7 +136,7 @@ export default function PropertyCard({ listing, isGoldStar = false, isViewed = f
       rounded-xl border bg-canvas-900 overflow-hidden transition-all duration-200
       hover:shadow-card-hover hover:border-canvas-500
       ${isGoldStar ? 'border-amber-500/50 shadow-glow-amber' : 'border-canvas-700 shadow-card'}
-      ${isViewedState ? 'opacity-60 grayscale-[20%]' : ''}
+      ${isViewedState && !starred ? 'opacity-60 grayscale-[20%]' : ''}
     `}>
       {/* Photo */}
       <a

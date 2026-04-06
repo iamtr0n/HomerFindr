@@ -230,8 +230,12 @@ class HomeHarvestProvider(BaseProvider):
             days_on_mls = _safe_int(row.get("days_on_mls"))
             agent_name = str(row.get("agent_name") or "").strip() or None
             _phones = row.get("agent_phones") or ""
-            if isinstance(_phones, list):
-                agent_phone = str(_phones[0]).strip() if _phones else None
+            if isinstance(_phones, list) and _phones:
+                _first = _phones[0]
+                if isinstance(_first, dict):
+                    agent_phone = str(_first.get("number") or "").strip() or None
+                else:
+                    agent_phone = str(_first).strip() or None
             else:
                 agent_phone = str(_phones).strip() or None
             agent_email = str(row.get("agent_email") or "").strip() or None

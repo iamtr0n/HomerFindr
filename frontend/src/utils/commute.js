@@ -5,7 +5,8 @@
  */
 
 const EARTH_RADIUS_MILES = 3_958.8
-const AVG_SPEED_MPH = 25  // urban driving average
+const PEAK_SPEED_MPH = 15    // rush hour (7–9 am, 4–7 pm) urban average
+const OFF_PEAK_SPEED_MPH = 30 // off-hours urban average
 
 function toRad(deg) {
   return deg * (Math.PI / 180)
@@ -23,9 +24,13 @@ function haversineDistance(lat1, lng1, lat2, lng2) {
 /**
  * Estimate one-way commute time in minutes between two lat/lng points.
  * Applies a 1.35x road factor to convert straight-line to driving distance.
+ * Returns { peak, offPeak } minutes for rush-hour vs. off-hours.
  */
 export function estimateCommute(homeLat, homeLng, workLat, workLng) {
   if (homeLat == null || homeLng == null || workLat == null || workLng == null) return null
   const distanceMiles = haversineDistance(homeLat, homeLng, workLat, workLng) * 1.35
-  return Math.round((distanceMiles / AVG_SPEED_MPH) * 60)
+  return {
+    peak: Math.round((distanceMiles / PEAK_SPEED_MPH) * 60),
+    offPeak: Math.round((distanceMiles / OFF_PEAK_SPEED_MPH) * 60),
+  }
 }

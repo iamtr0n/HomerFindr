@@ -60,7 +60,7 @@ function writeDismissed(set) {
   try { localStorage.setItem(DISMISSED_KEY, JSON.stringify([...set])) } catch {}
 }
 
-export default function PropertyCard({ listing, isGoldStar = false, isViewed = false, maxScore = 5, onToggleStar, mortgageSettings, onDismiss, commuteMinutes }) {
+export default function PropertyCard({ listing, isGoldStar = false, isViewed = false, maxScore = 5, onToggleStar, mortgageSettings, onDismiss, commute }) {
   const {
     id: listingId, address, city, state, price, list_price, bedrooms, bathrooms, sqft, year_built,
     has_garage, has_basement, stories, hoa_monthly, photo_url, source_url,
@@ -269,12 +269,16 @@ export default function PropertyCard({ listing, isGoldStar = false, isViewed = f
             : 'text-red-400'
           }`}>~${monthlyPayment.toLocaleString()}/mo</p>
         )}
-        {commuteMinutes != null && (
-          <p className="text-xs text-ink-muted mb-1">
-            ~{commuteMinutes} min to work
-            <span className={`ml-1 font-medium ${commuteMinutes <= 20 ? 'text-match-strong' : commuteMinutes <= 40 ? 'text-match-warn' : 'text-red-400'}`}>
-              ●
+        {commute != null && (
+          <p className="text-xs text-ink-muted mb-1 flex items-center gap-1.5">
+            <span className={`font-medium ${commute.peak <= 20 ? 'text-match-strong' : commute.peak <= 40 ? 'text-match-warn' : 'text-red-400'}`}>
+              {commute.offPeak}–{commute.peak} min
             </span>
+            <span>to work</span>
+            <span className="text-ink-muted/60">·</span>
+            <span className="text-ink-muted/80">{commute.offPeak} off-peak</span>
+            <span className="text-ink-muted/60">/</span>
+            <span className="text-ink-muted/80">{commute.peak} rush</span>
           </p>
         )}
 

@@ -77,7 +77,7 @@ def get_comparable_listings(listing: Listing, radius_miles: float = 1.5, days_ba
                 has_basement = True if "basement" in desc_lower else None
 
                 comp_listing = ListingModel(
-                    source="homeharvest_comp",
+                    source="realtor",
                     source_id=source_id,
                     address=street,
                     city=city,

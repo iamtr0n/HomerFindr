@@ -44,11 +44,35 @@ export default function Dashboard() {
 
   const dismissMutation = useMutation({
     mutationFn: (sourceId) => api.dismissListing(sourceId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['dismissed'] }),
+    onMutate: async (sourceId) => {
+      await queryClient.cancelQueries({ queryKey: ['dismissed'] })
+      const previous = queryClient.getQueryData(['dismissed'])
+      queryClient.setQueryData(['dismissed'], (old) => ({
+        ...old,
+        dismissed: [...(old?.dismissed || []), sourceId],
+      }))
+      return { previous }
+    },
+    onError: (_err, _sourceId, context) => {
+      queryClient.setQueryData(['dismissed'], context.previous)
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['dismissed'] }),
   })
   const undismissMutation = useMutation({
     mutationFn: (sourceId) => api.undismissListing(sourceId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['dismissed'] }),
+    onMutate: async (sourceId) => {
+      await queryClient.cancelQueries({ queryKey: ['dismissed'] })
+      const previous = queryClient.getQueryData(['dismissed'])
+      queryClient.setQueryData(['dismissed'], (old) => ({
+        ...old,
+        dismissed: (old?.dismissed || []).filter((id) => id !== sourceId),
+      }))
+      return { previous }
+    },
+    onError: (_err, _sourceId, context) => {
+      queryClient.setQueryData(['dismissed'], context.previous)
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['dismissed'] }),
   })
   const handleDismiss = useCallback((sourceId) => { dismissMutation.mutate(sourceId) }, [dismissMutation])
 
@@ -586,7 +610,7 @@ export default function Dashboard() {
                   onToggleStar={starMutation.mutate}
                   mortgageSettings={mortgageSettings.enabled ? mortgageSettings : null}
                   onDismiss={handleDismiss}
-                  commuteMinutes={workLocation && listing.latitude && listing.longitude
+                  commute={workLocation && listing.latitude && listing.longitude
                     ? estimateCommute(listing.latitude, listing.longitude, workLocation.lat, workLocation.lng)
                     : null}
                 />
@@ -615,7 +639,7 @@ export default function Dashboard() {
                   onToggleStar={starMutation.mutate}
                   mortgageSettings={mortgageSettings.enabled ? mortgageSettings : null}
                   onDismiss={handleDismiss}
-                  commuteMinutes={workLocation && listing.latitude && listing.longitude
+                  commute={workLocation && listing.latitude && listing.longitude
                     ? estimateCommute(listing.latitude, listing.longitude, workLocation.lat, workLocation.lng)
                     : null}
                 />
@@ -653,7 +677,7 @@ export default function Dashboard() {
                   onToggleStar={starMutation.mutate}
                   mortgageSettings={mortgageSettings.enabled ? mortgageSettings : null}
                   onDismiss={handleDismiss}
-                  commuteMinutes={workLocation && listing.latitude && listing.longitude
+                  commute={workLocation && listing.latitude && listing.longitude
                     ? estimateCommute(listing.latitude, listing.longitude, workLocation.lat, workLocation.lng)
                     : null}
                 />

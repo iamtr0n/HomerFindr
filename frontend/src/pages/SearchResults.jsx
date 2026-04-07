@@ -280,7 +280,7 @@ export default function SearchResults() {
                   onToggleStar={starMutation.mutate}
                   mortgageSettings={mortgageSettings.enabled ? mortgageSettings : null}
                   onDismiss={handleDismiss}
-                  commuteMinutes={workLocation && listing.latitude && listing.longitude
+                  commute={workLocation && listing.latitude && listing.longitude
                     ? estimateCommute(listing.latitude, listing.longitude, workLocation.lat, workLocation.lng)
                     : null}
                 />
@@ -308,7 +308,7 @@ export default function SearchResults() {
                     onToggleStar={starMutation.mutate}
                     mortgageSettings={mortgageSettings.enabled ? mortgageSettings : null}
                     onDismiss={handleDismiss}
-                    commuteMinutes={workLocation && listing.latitude && listing.longitude
+                    commute={workLocation && listing.latitude && listing.longitude
                       ? estimateCommute(listing.latitude, listing.longitude, workLocation.lat, workLocation.lng)
                       : null}
                   />

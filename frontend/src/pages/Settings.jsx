@@ -469,7 +469,7 @@ export default function Settings() {
       {/* Report Schedule */}
       <Section icon={Clock} title="Report Schedule">
         <p className="text-xs text-ink-muted -mt-1">Daily digest and email report time</p>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
           <select
             value={scheduleForm.report_hour % 12 === 0 ? 12 : scheduleForm.report_hour % 12}
             onChange={e => {
@@ -477,14 +477,15 @@ export default function Settings() {
               const isPm = scheduleForm.report_hour >= 12
               setSchedule({ ...scheduleForm, report_hour: isPm ? (h12 === 12 ? 12 : h12 + 12) : (h12 === 12 ? 0 : h12) })
             }}
-            className={inputCls + ' w-24'}
+            className={inputCls + ' w-16'}
           >
             {[12,1,2,3,4,5,6,7,8,9,10,11].map(h => <option key={h} value={h}>{h}</option>)}
           </select>
+          <span className="text-ink-muted">:</span>
           <select
             value={scheduleForm.report_minute}
             onChange={e => setSchedule({ ...scheduleForm, report_minute: Number(e.target.value) })}
-            className={inputCls + ' w-24'}
+            className={inputCls + ' w-16'}
           >
             {[0,15,30,45].map(m => <option key={m} value={m}>{String(m).padStart(2,'0')}</option>)}
           </select>
@@ -495,7 +496,7 @@ export default function Settings() {
               const h12 = scheduleForm.report_hour % 12 === 0 ? 12 : scheduleForm.report_hour % 12
               setSchedule({ ...scheduleForm, report_hour: isPm ? (h12 === 12 ? 12 : h12 + 12) : (h12 === 12 ? 0 : h12) })
             }}
-            className={inputCls + ' w-20'}
+            className={inputCls + ' w-16'}
           >
             <option value="am">AM</option>
             <option value="pm">PM</option>

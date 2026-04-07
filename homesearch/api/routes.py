@@ -880,31 +880,39 @@ def zips_from_polygon(body: dict):
 def open_cli():
     """Open a terminal window running the homesearch CLI (local machine only)."""
     import platform
+    import shutil
     import subprocess
     system = platform.system()
-    cmd = "homesearch"
+    # Prefer the full path so new shell sessions don't need to resolve PATH
+    exe = shutil.which("homesearch") or "homesearch"
     try:
         if system == "Darwin":
+            # Source shell profiles so PATH is correct, then run homesearch
+            shell_cmd = (
+                f'source ~/.zprofile 2>/dev/null; source ~/.zshrc 2>/dev/null; '
+                f'source ~/.bash_profile 2>/dev/null; source ~/.bashrc 2>/dev/null; '
+                f'{exe}'
+            )
             subprocess.Popen([
                 "osascript",
                 "-e", "tell application \"Terminal\"",
                 "-e", "activate",
-                "-e", f"do script \"{cmd}\"",
+                "-e", f"do script \"{shell_cmd}\"",
                 "-e", "end tell",
             ])
         elif system == "Windows":
             subprocess.Popen(
-                ["cmd.exe", "/k", cmd],
+                ["cmd.exe", "/k", exe],
                 creationflags=subprocess.CREATE_NEW_CONSOLE,
             )
         else:
             for term in ["gnome-terminal", "xterm", "konsole", "xfce4-terminal"]:
                 try:
-                    subprocess.Popen([term, "-e", cmd])
+                    subprocess.Popen([term, "-e", exe])
                     break
                 except FileNotFoundError:
                     continue
-        return {"success": True, "platform": system}
+        return {"success": True, "platform": system, "exe": exe}
     except Exception as e:
         return {"success": False, "error": str(e), "platform": system}
 

@@ -1,0 +1,1 @@
+See the full BuzzBook Master Plan v2.0 - this is a placeholder. The full 5,437-line document is available locally at /home/user/Boothlytics/BUZZBOOK_MASTER_PLAN.md and /home/user/quoteme/BUZZBOOK_MASTER_PLAN.md. Git push from CLI is blocked by a 503 proxy error. The full file will be pushed once the proxy recovers.
